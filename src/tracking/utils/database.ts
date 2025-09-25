@@ -12,7 +12,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { DatabaseConfig } from '@/types';
+import { DatabaseConfig } from '../../types';
 
 /**
  * Veritabanı yöneticisi sınıfı

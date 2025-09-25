@@ -26,7 +26,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Yardımcı araçları ve servisleri içe aktar
-import { db, redis, createLogger, setupRequestTracking, getHealthStatus } from '@/tracking/utils';
+import { db, redis, createLogger, setupRequestTracking, getHealthStatus } from './tracking/utils';
 
 // Sunucu için logger oluştur
 const logger = createLogger('Server');
@@ -147,7 +147,7 @@ fastify.get('/health', async (_request, reply) => {
  */
 fastify.get('/metrics', async (_request, reply) => {
   try {
-    const { metricsCollector } = await import('@/tracking/utils');
+    const { metricsCollector } = await import('./tracking/utils');
     const metrics = metricsCollector.getMetrics();
     reply.send(metrics);
   } catch (error) {
@@ -200,7 +200,7 @@ async function registerRoutes() {
      */
     fastify.post('/presence/beat', async (request, reply) => {
       try {
-        const { heartbeatPayloadSchema } = await import('@/tracking/utils/validation');
+        const { heartbeatPayloadSchema } = await import('./tracking/utils/validation');
         const payload = heartbeatPayloadSchema.parse(request.body);
         
         // Kullanıcı varlığını Redis'e ekle
@@ -220,7 +220,7 @@ async function registerRoutes() {
 
     fastify.post('/presence/bye', async (request, reply) => {
       try {
-        const { heartbeatPayloadSchema } = await import('@/tracking/utils/validation');
+        const { heartbeatPayloadSchema } = await import('./tracking/utils/validation');
         const payload = heartbeatPayloadSchema.parse(request.body);
         
         // Remove from current session tracking
@@ -263,7 +263,7 @@ async function registerRoutes() {
     // Page view collection
     fastify.post('/collect/page_view', async (request, reply) => {
       try {
-        const { pageViewSchema } = await import('@/tracking/utils/validation');
+        const { pageViewSchema } = await import('./tracking/utils/validation');
         const pageView = pageViewSchema.parse(request.body);
         
         // Store in database

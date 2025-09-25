@@ -20,7 +20,7 @@
  */
 
 import { Redis } from 'ioredis';
-import { RedisConfig } from '@/types';
+import { RedisConfig } from '../../types';
 
 /**
  * Redis yöneticisi sınıfı
