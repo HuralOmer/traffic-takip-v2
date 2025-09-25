@@ -404,6 +404,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 async function start() {
   try {
     // Check database and Redis connections
+    logger.info('Checking database and Redis connections...');
     const dbHealthy = await db.healthCheck();
     const redisHealthy = await redis.healthCheck();
 
