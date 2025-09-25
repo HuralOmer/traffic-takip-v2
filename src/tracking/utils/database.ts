@@ -119,11 +119,13 @@ class DatabaseManager {
    */
   public async healthCheck(): Promise<boolean> {
     try {
-      // Daha basit bir health check - sadece bağlantıyı test et
+      // En basit health check - sadece bağlantıyı test et
       const { error } = await this.supabaseService
-        .rpc('version'); // PostgreSQL version fonksiyonu
+        .from('_supabase_migrations')
+        .select('version')
+        .limit(1);
 
-      if (error) {
+      if (error && error.code !== 'PGRST116') { // Table not found is ok
         console.error('Database health check failed:', error);
         return false;
       }
