@@ -120,17 +120,27 @@ class RedisManager {
 
   // EMA state management
   public async getEMAState(shop: string): Promise<{ ema_fast: number; ema_slow: number; last_ts: number } | null> {
+    if (!this.redis) {
+      console.log(`Mock: getEMAState for ${shop}`);
+      return null;
+    }
+    
     const key = `presence:ema:${shop}`;
     const data = await this.redis.hgetall(key);
     
-    if (!data['ema_fast'] || !data['ema_slow'] || !data['last_ts']) {
+    if (!data || !data['ema_fast'] || !data['ema_slow'] || !data['last_ts']) {
       return null;
     }
 
+    // Tip güvenliği için string kontrolü ekle
+    const ema_fast_str = String(data['ema_fast']);
+    const ema_slow_str = String(data['ema_slow']);
+    const last_ts_str = String(data['last_ts']);
+
     return {
-      ema_fast: parseFloat(data['ema_fast']),
-      ema_slow: parseFloat(data['ema_slow']),
-      last_ts: parseInt(data['last_ts']),
+      ema_fast: parseFloat(ema_fast_str),
+      ema_slow: parseFloat(ema_slow_str),
+      last_ts: parseInt(last_ts_str),
     };
   }
 
@@ -177,7 +187,7 @@ class RedisManager {
     await this.redis.publish(channel, JSON.stringify(message));
   }
 
-  public async subscribe(channel: string, callback: (message: any) => void): Promise<void> {
+  public async subscribe(_channel: string, _callback: (message: any) => void): Promise<void> {
     // Upstash REST API doesn't support persistent subscriptions
     // This would need to be implemented with WebSockets or polling
     console.warn('Pub/Sub not supported with Upstash REST API');
