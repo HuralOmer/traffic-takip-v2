@@ -42,16 +42,25 @@ class RedisManager {
     console.log('UPSTASH_REDIS_REST_TOKEN:', process.env['UPSTASH_REDIS_REST_TOKEN'] ? 'SET' : 'NOT SET');
 
     if (!config.url || !config.token) {
-      throw new Error('Redis configuration is missing. Please check your environment variables.');
+      console.warn('Redis configuration is missing. Running in mock mode.');
+      // Mock Redis client for development
+      this.redis = null as any;
+      return;
     }
 
-    // Upstash Redis REST API client'ı oluştur
-    this.redis = new Redis({
-      url: config.url,
-      token: config.token,
-    });
+    try {
+      // Upstash Redis REST API client'ı oluştur
+      this.redis = new Redis({
+        url: config.url,
+        token: config.token,
+      });
 
-    console.log('Redis client initialized successfully');
+      console.log('Redis client initialized successfully');
+    } catch (error) {
+      console.error('Redis initialization failed:', error);
+      console.warn('Running in mock mode.');
+      this.redis = null as any;
+    }
   }
 
   public static getInstance(): RedisManager {
@@ -67,6 +76,11 @@ class RedisManager {
 
   // Presence tracking methods
   public async addPresence(shop: string, visitorId: string, sessionId: string, pagePath: string): Promise<void> {
+    if (!this.redis) {
+      console.log(`Mock: addPresence for ${shop}, ${visitorId}, ${sessionId}, ${pagePath}`);
+      return;
+    }
+    
     const now = Date.now();
     const key = `presence:v:${shop}`;
     
@@ -75,6 +89,11 @@ class RedisManager {
   }
 
   public async getActiveUsers(shop: string): Promise<number> {
+    if (!this.redis) {
+      console.log(`Mock: getActiveUsers for ${shop}`);
+      return 0;
+    }
+    
     const key = `presence:v:${shop}`;
     const now = Date.now();
     const ttl = 30000; // 30 seconds
