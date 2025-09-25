@@ -1,7 +1,7 @@
 /**
  * Redis Yönetim Sınıfı
  * 
- * Bu sınıf, Redis bağlantısını yönetir ve trafik takip sistemi için
+ * Bu sınıf, Upstash Redis REST API bağlantısını yönetir ve trafik takip sistemi için
  * gerekli Redis operasyonlarını sağlar. Singleton pattern kullanır.
  * 
  * Redis Kullanım Alanları:
@@ -13,13 +13,13 @@
  * - Caching (önbellekleme)
  * 
  * Özellikler:
- * - Otomatik yeniden bağlanma
+ * - Upstash REST API kullanımı
  * - Health check
  * - Error handling
  * - Connection pooling
  */
 
-import { Redis } from 'ioredis';
+import { Redis } from '@upstash/redis';
 import { RedisConfig } from '../../types';
 
 /**
@@ -36,31 +36,22 @@ class RedisManager {
       token: process.env['UPSTASH_REDIS_REST_TOKEN'] || '',
     };
 
+    // Debug: Environment variables'ları logla
+    console.log('Redis Environment Variables Debug:');
+    console.log('UPSTASH_REDIS_REST_URL:', process.env['UPSTASH_REDIS_REST_URL'] ? 'SET' : 'NOT SET');
+    console.log('UPSTASH_REDIS_REST_TOKEN:', process.env['UPSTASH_REDIS_REST_TOKEN'] ? 'SET' : 'NOT SET');
+
     if (!config.url || !config.token) {
       throw new Error('Redis configuration is missing. Please check your environment variables.');
     }
 
-    // Parse Redis URL to get host and port
-    const url = new URL(config.url);
-    const host = url.hostname;
-    const port = parseInt(url.port) || 6379;
-
+    // Upstash Redis REST API client'ı oluştur
     this.redis = new Redis({
-      host,
-      port,
-      password: config.token,
-      enableReadyCheck: false,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true,
+      url: config.url,
+      token: config.token,
     });
 
-    this.redis.on('error', (error) => {
-      console.error('Redis connection error:', error);
-    });
-
-    this.redis.on('connect', () => {
-      console.log('Redis connected successfully');
-    });
+    console.log('Redis client initialized successfully');
   }
 
   public static getInstance(): RedisManager {
@@ -79,7 +70,7 @@ class RedisManager {
     const now = Date.now();
     const key = `presence:v:${shop}`;
     
-    await this.redis.zadd(key, now, `${visitorId}:${sessionId}:${pagePath}`);
+    await this.redis.zadd(key, { score: now, member: `${visitorId}:${sessionId}:${pagePath}` });
     await this.redis.expire(key, 60); // 60 seconds TTL
   }
 
@@ -137,7 +128,7 @@ class RedisManager {
   // Session management
   public async setCurrentSession(shop: string, visitorId: string, sessionId: string): Promise<void> {
     const key = `visitor:current_session:${shop}:${visitorId}`;
-    await this.redis.set(key, sessionId, 'EX', 1800); // 30 minutes TTL
+    await this.redis.set(key, sessionId, { ex: 1800 }); // 30 minutes TTL
   }
 
   public async getCurrentSession(shop: string, visitorId: string): Promise<string | null> {
@@ -168,18 +159,9 @@ class RedisManager {
   }
 
   public async subscribe(channel: string, callback: (message: any) => void): Promise<void> {
-    const subscriber = this.redis.duplicate();
-    await subscriber.subscribe(channel);
-    
-    subscriber.on('message', (ch, message) => {
-      if (ch === channel) {
-        try {
-          callback(JSON.parse(message));
-        } catch (error) {
-          console.error('Error parsing Redis message:', error);
-        }
-      }
-    });
+    // Upstash REST API doesn't support persistent subscriptions
+    // This would need to be implemented with WebSockets or polling
+    console.warn('Pub/Sub not supported with Upstash REST API');
   }
 
   // Health check
@@ -195,7 +177,8 @@ class RedisManager {
 
   // Cleanup method
   public async cleanup(): Promise<void> {
-    await this.redis.quit();
+    // Upstash REST API doesn't require explicit cleanup
+    console.log('Redis cleanup completed');
   }
 }
 
