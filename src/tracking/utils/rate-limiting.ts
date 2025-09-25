@@ -66,7 +66,7 @@ export class RateLimiter {
       : `rate_limit:${identifier}`;
 
     const current = await redis.getClient().get(key);
-    const count = current ? parseInt(current) : 0;
+    const count = current ? parseInt(String(current)) : 0;
     
     return Math.max(0, this.config.max - count);
   }
@@ -123,9 +123,9 @@ export class SlidingWindowRateLimiter {
     const current = await redis.getClient().zcard(key);
 
     if (current >= this.config.max) {
-      const oldestEntry = await redis.getClient().zrange(key, 0, 0, 'WITHSCORES');
+      const oldestEntry = await redis.getClient().zrange(key, 0, 0, { withScores: true });
       const resetTime = oldestEntry.length > 0 && oldestEntry[1] 
-        ? parseInt(oldestEntry[1]) + this.config.windowMs
+        ? parseInt(String(oldestEntry[1])) + this.config.windowMs
         : now + this.config.windowMs;
 
       return {
@@ -136,7 +136,7 @@ export class SlidingWindowRateLimiter {
     }
 
     // Add current request
-    await redis.getClient().zadd(key, now, `${now}-${Math.random()}`);
+    await redis.getClient().zadd(key, { score: now, member: `${now}-${Math.random()}` });
     await redis.getClient().expire(key, Math.ceil(this.config.windowMs / 1000));
 
     return {
@@ -208,8 +208,8 @@ export class BurstProtection {
     const requestId = `${now}-${Math.random()}`;
     
     await Promise.all([
-      redis.getClient().zadd(burstKey, now, requestId),
-      redis.getClient().zadd(normalKey, now, requestId),
+      redis.getClient().zadd(burstKey, { score: now, member: requestId }),
+      redis.getClient().zadd(normalKey, { score: now, member: requestId }),
       redis.getClient().expire(burstKey, Math.ceil(this.config.burstWindowMs / 1000)),
       redis.getClient().expire(normalKey, Math.ceil(this.config.normalWindowMs / 1000)),
     ]);
@@ -259,11 +259,8 @@ export class DistributedRateLimiter {
 
     const result = await redis.getClient().eval(
       this.script,
-      1,
-      key,
-      max.toString(),
-      window.toString(),
-      now.toString()
+      [key],
+      [max.toString(), window.toString(), now.toString()]
     ) as [number, number];
 
     const [allowed, ttl] = result;
