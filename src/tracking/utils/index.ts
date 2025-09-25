@@ -22,16 +22,16 @@ export { db, default as database } from './database';
 export { redis, default as redisClient } from './redis';
 
 // Veri doğrulama yardımcıları
-export * from './validation.js';
+export * from './validation';
 
 // Genel yardımcı fonksiyonlar
-export * from './helpers.js';
+export * from './helpers';
 
 // Rate limiting yardımcıları
-export * from './rate-limiting.js';
+export * from './rate-limiting';
 
 // Gözlemlenebilirlik yardımcıları
-export * from './observability.js';
+export * from './observability';
 
 // Sistem sabitleri
-export * from './constants.js';
+export * from './constants';

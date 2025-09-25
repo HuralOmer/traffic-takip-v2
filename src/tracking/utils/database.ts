@@ -119,12 +119,17 @@ class DatabaseManager {
    */
   public async healthCheck(): Promise<boolean> {
     try {
+      // Daha basit bir health check - sadece bağlantıyı test et
       const { error } = await this.supabaseService
-        .from('active_users_minutely')
-        .select('count')
-        .limit(1);
+        .rpc('version'); // PostgreSQL version fonksiyonu
 
-      return !error;
+      if (error) {
+        console.error('Database health check failed:', error);
+        return false;
+      }
+
+      console.log('Database health check passed');
+      return true;
     } catch (error) {
       console.error('Database health check failed:', error);
       return false;
