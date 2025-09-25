@@ -118,9 +118,24 @@ class DatabaseManager {
    * @returns boolean - Veritabanı sağlıklı mı?
    */
   public async healthCheck(): Promise<boolean> {
-    // Health check tamamen devre dışı - her zaman true döndür
-    console.log('Database health check skipped - always returning true');
-    return true;
+    try {
+      // Gerçek Supabase bağlantısını test et
+      const { error } = await this.supabaseService
+        .from('information_schema.tables')
+        .select('table_name')
+        .limit(1);
+
+      if (error) {
+        console.error('Database health check failed:', error);
+        return false;
+      }
+
+      console.log('Database health check passed');
+      return true;
+    } catch (error) {
+      console.error('Database health check failed:', error);
+      return false;
+    }
   }
 }
 

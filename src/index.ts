@@ -403,9 +403,21 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 // Start server
 async function start() {
   try {
-    // Skip health checks completely for now to allow server startup
-    logger.warn('Health checks disabled - server will start without database/Redis validation');
-    logger.info('Server will start with available database and Redis connections');
+    // Check database and Redis connections
+    const dbHealthy = await db.healthCheck();
+    const redisHealthy = await redis.healthCheck();
+
+    if (!dbHealthy) {
+      logger.error('Database connection failed');
+      throw new Error('Database connection failed');
+    }
+
+    if (!redisHealthy) {
+      logger.error('Redis connection failed');
+      throw new Error('Redis connection failed');
+    }
+
+    logger.info('Database and Redis connections established successfully');
 
     // Register plugins and routes
     await registerPlugins();

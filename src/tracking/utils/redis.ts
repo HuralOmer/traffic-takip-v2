@@ -195,9 +195,20 @@ class RedisManager {
 
   // Health check
   public async healthCheck(): Promise<boolean> {
-    // Health check tamamen devre dışı - her zaman true döndür
-    console.log('Redis health check skipped - always returning true');
-    return true;
+    if (!this.redis) {
+      console.log('Redis client not initialized - returning false');
+      return false;
+    }
+
+    try {
+      // Upstash Redis REST API için basit bir test
+      const result = await this.redis.ping();
+      console.log('Redis health check passed:', result);
+      return true;
+    } catch (error) {
+      console.error('Redis health check failed:', error);
+      return false;
+    }
   }
 
   // Cleanup method
