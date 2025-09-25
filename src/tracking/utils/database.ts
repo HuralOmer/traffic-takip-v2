@@ -35,6 +35,13 @@ class DatabaseManager {
       service_role_key: process.env['SUPABASE_SERVICE_ROLE_KEY'] || '',
     };
 
+    // Debug: Environment variables'ları logla
+    console.log('Environment Variables Debug:');
+    console.log('SUPABASE_URL:', process.env['SUPABASE_URL'] ? 'SET' : 'NOT SET');
+    console.log('SUPABASE_ANON_KEY:', process.env['SUPABASE_ANON_KEY'] ? 'SET' : 'NOT SET');
+    console.log('SUPABASE_SERVICE_ROLE_KEY:', process.env['SUPABASE_SERVICE_ROLE_KEY'] ? 'SET' : 'NOT SET');
+    console.log('All env keys:', Object.keys(process.env).filter(key => key.includes('SUPABASE')));
+
     // Konfigürasyon kontrolü
     if (!config.url || !config.anon_key || !config.service_role_key) {
       throw new Error('Supabase configuration is missing. Please check your environment variables.');
