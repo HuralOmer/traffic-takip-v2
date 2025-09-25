@@ -39,7 +39,7 @@
     
 
 
-  "start": "node dist/index.js",
+  "start": "NODE_OPTIONS='--no-deprecation' node dist/index.js",
   
 
 
