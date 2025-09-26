@@ -725,6 +725,27 @@ async function registerRoutes() {
 fastify.setErrorHandler(async (error, request, reply) => {
   logger.error('Unhandled error', { error, url: request.url, method: request.method });
   
+  // Scope error kontrolü
+  if (error.statusCode === 403) {
+    const { ScopeErrorHandler } = await import('./tracking/utils/scope-error-handler');
+    
+    if (ScopeErrorHandler.isScopeError(error)) {
+      ScopeErrorHandler.handleScopeError(error, {
+        url: request.url,
+        method: request.method,
+        shop: request.headers['x-shop'] as string,
+        timestamp: Date.now()
+      });
+      
+      reply.status(403).send({
+        error: 'Scope error',
+        message: 'Bu özellik için ek izin gerekli. Lütfen uygulamayı güncelleyin.',
+        required_scope: ScopeErrorHandler.extractRequiredScope(error)
+      });
+      return;
+    }
+  }
+  
   reply.status(500).send({
     error: 'Internal server error',
     message: process.env['NODE_ENV'] === 'development' ? error.message : 'Something went wrong',

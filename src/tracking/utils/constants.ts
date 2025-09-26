@@ -324,6 +324,12 @@ export const ERROR_MESSAGES = {
   FORBIDDEN: 'Forbidden',
   NOT_FOUND: 'Not found',
   INTERNAL_ERROR: 'Internal server error',
+  // Scope error messages
+  INSUFFICIENT_SCOPE: 'Insufficient scope',
+  SCOPE_REQUIRED: 'Scope required',
+  SCOPE_ERROR: 'Scope error',
+  PERMISSION_DENIED: 'Permission denied',
+  ACCESS_DENIED: 'Access denied',
 } as const;
 
 // Success messages
