@@ -150,29 +150,32 @@ export class ScopeManager {
 
     const hasError = missingScopes.length > 0;
 
-    let message: string | undefined;
-    let recommendations: string[] | undefined;
-
     if (hasError) {
       const missingScopeInfos = missingScopes.map(name => 
         this.REQUIRED_SCOPES.find(scope => scope.name === name)
       ).filter(Boolean) as ScopeInfo[];
 
-      message = `Eksik scope'lar: ${missingScopeInfos.map(scope => scope.description).join(', ')}`;
+      const message = `Eksik scope\'lar: ${missingScopeInfos.map(scope => scope.description).join(', ')}`;
       
-      recommendations = [
+      const recommendations = [
         'Lütfen uygulamayı güncelleyin ve gerekli izinleri verin',
-        'Partner Dashboard > App Settings > API Permissions bölümünden scope'ları güncelleyin',
+        'Partner Dashboard > App Settings > API Permissions bölümünden scope\'ları güncelleyin',
         'Uygulamayı yeniden yükleyin'
       ];
+
+      return {
+        hasError,
+        missingScopes,
+        availableScopes,
+        message,
+        recommendations
+      };
     }
 
     return {
       hasError,
       missingScopes,
-      availableScopes,
-      message,
-      recommendations
+      availableScopes
     };
   }
 
@@ -238,12 +241,13 @@ export class ScopeManager {
         acc[scope.category] = { total: 0, available: 0, missing: 0 };
       }
       
-      acc[scope.category].total++;
+      const category = acc[scope.category]!;
+      category.total++;
       
       if (this.currentScopes.includes(scope.name)) {
-        acc[scope.category].available++;
+        category.available++;
       } else {
-        acc[scope.category].missing++;
+        category.missing++;
       }
       
       return acc;
