@@ -1,0 +1,197 @@
+{% comment %}
+  HRL Traffic Tracking - Ana Tracking Script
+  
+  Bu dosya, Shopify mağazalarına trafik takip script'ini enjekte eder.
+  App Proxy üzerinden dinamik olarak yüklenen JavaScript kullanır.
+  
+  Özellikler:
+  - Tek seferlik enjeksiyon (tema değişikliği gerektirmez)
+  - Dinamik konfigürasyon (sunucu tarafından güncellenebilir)
+  - Feature flags ile modüler kontrol
+  - Cache busting ile kolay güncelleme
+{% endcomment %}
+
+{% comment %}
+  Tracking'in etkin olup olmadığını kontrol et
+  Eğer etkin değilse script yükleme
+{% endcomment %}
+{% if settings.enable_tracking %}
+
+{% comment %}
+  App Proxy subpath'i ayarlardan al
+  Eğer ayarlanmamışsa varsayılan değer kullan
+{% endcomment %}
+{% assign app_proxy_subpath = settings.app_proxy_subpath | default: 'hrl-proxy' %}
+{% assign script_version = settings.script_version | default: 1 %}
+
+{% comment %}
+  Tracking script'ini inline olarak yükle
+  - Performance: Inline script daha hızlı yüklenir
+  - CDN: Shopify CDN uyarısı ortadan kalkar
+  - Dinamik konfigürasyon: Liquid template ile
+{% endcomment %}
+<script>
+(function() {
+  'use strict';
+  
+  // Configuration
+  const config = {
+    shop: '{{ shop.permanent_domain }}',
+    version: '{{ script_version }}',
+    proxyPath: '/app-proxy/tracking.js',
+    loaded: false,
+    startTime: Date.now()
+  };
+  
+  // Performance monitoring
+  function logPerformance() {
+    const loadTime = Date.now() - config.startTime;
+    console.log(`HRL Tracking: Script yüklendi (${loadTime}ms)`);
+  }
+  
+  // Asıl tracking script'ini yükle
+  function loadTrackingScript() {
+    return new Promise((resolve, reject) => {
+      const versionParam = config.version ? `?v=${config.version}` : '';
+      const scriptUrl = `https://${config.shop}${config.proxyPath}${versionParam}`;
+      
+      const script = document.createElement('script');
+      script.src = scriptUrl;
+      script.defer = true;
+      script.async = true;
+      
+      script.onload = function() {
+        config.loaded = true;
+        logPerformance();
+        resolve();
+      };
+      
+      script.onerror = function(error) {
+        console.error('HRL Tracking: Script yüklenirken hata oluştu:', error);
+        reject(error);
+      };
+      
+      document.head.appendChild(script);
+    });
+  }
+  
+  // Fallback mekanizması
+  function createFallback() {
+    console.warn('HRL Tracking: App Proxy script yüklenemedi. Fallback moduna geçiliyor...');
+    
+    window.HRLTracking = {
+      init: function() {
+        console.log('HRL Tracking: Fallback modu aktif');
+        config.loaded = true;
+        logPerformance();
+      },
+      track: function(event, data) {
+        console.log('HRL Tracking (Fallback):', event, data);
+      },
+      isLoaded: function() {
+        return config.loaded;
+      }
+    };
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', window.HRLTracking.init);
+    } else {
+      window.HRLTracking.init();
+    }
+  }
+  
+  // Ana başlatma fonksiyonu
+  function init() {
+    loadTrackingScript().catch(createFallback);
+  }
+  
+  // Script'i başlat
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
+
+{% endif %}
+
+{% comment %}
+  Fallback: Eğer App Proxy çalışmazsa
+  Bu durumda basit bir console log bırak
+{% endcomment %}
+<script>
+  // Fallback script - App Proxy yüklenemezse çalışır
+  window.addEventListener('load', function() {
+    if (typeof window.HRLTracking === 'undefined') {
+      console.warn('HRL Tracking: App Proxy script yüklenemedi. Lütfen App Proxy ayarlarını kontrol edin.');
+    }
+  });
+</script>
+
+{% comment %}
+  Debug modu (ayarlardan kontrol et)
+  Sadece debug modu aktifse çalışır
+{% endcomment %}
+{% if settings.enable_debug %}
+<script>
+  console.log('HRL Tracking Debug:', {
+    shop: '{{ shop.permanent_domain }}',
+    app_proxy_subpath: '{{ app_proxy_subpath }}',
+    script_version: '{{ script_version }}',
+    proxy_url: 'https://{{ shop.permanent_domain }}/app-proxy/tracking.js?v={{ script_version }}',
+    tracking_enabled: {{ settings.enable_tracking }},
+    script_type: 'inline'
+  });
+</script>
+{% endif %}
+
+{% schema %}
+{
+  "name": "HRL Traffic Tracking",
+  "target": "section",
+  "category": "Analytics",
+  "settings": [
+    {
+      "type": "header",
+      "content": "App Proxy Ayarları"
+    },
+    {
+      "type": "text",
+      "id": "app_proxy_subpath",
+      "label": "App Proxy Alt Yolu",
+      "default": "hrl-proxy",
+      "info": "App Proxy alt yolu (örn: hrl-proxy). Bu değer değiştirilmemelidir."
+    },
+    {
+      "type": "header",
+      "content": "Tracking Ayarları"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_tracking",
+      "label": "Trafik Takibini Etkinleştir",
+      "default": true,
+      "info": "Bu seçenek kapatılırsa tracking script'i yüklenmez."
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_debug",
+      "label": "Debug Modu",
+      "default": false,
+      "info": "Debug modu aktif olduğunda console'da detaylı loglar görünür."
+    },
+    {
+      "type": "header",
+      "content": "Gelişmiş Ayarlar"
+    },
+    {
+      "type": "number",
+      "id": "script_version",
+      "label": "Script Versiyonu",
+      "default": 1,
+      "info": "Script versiyonu (cache busting için). Değiştirmeyin."
+    }
+  ]
+}
+{% endschema %}
