@@ -17,3 +17,6 @@ export * from './validation';
 export * from './scope-error-handler';
 export * from './scope-manager';
 export * from './shopify-api';
+
+// HMAC verification exports
+export * from './hmac-verification';

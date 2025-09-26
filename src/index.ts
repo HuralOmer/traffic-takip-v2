@@ -28,6 +28,7 @@ dotenv.config();
 // Yardımcı araçları ve servisleri içe aktar
 import { db, redis, createLogger, setupRequestTracking, getHealthStatus } from './tracking/utils';
 import { ActiveUsersManager } from './tracking/active-users';
+import { verifyProxyHmac, getShopFromQuery, HMAC_ERRORS } from './tracking/utils/hmac-verification';
 
 // Sunucu için logger oluştur
 const logger = createLogger('Server');
@@ -394,6 +395,78 @@ async function registerPlugins() {
 }
 
 /**
+ * HMAC Doğrulama Middleware'i
+ * 
+ * Tüm /app-proxy/* istekleri için HMAC doğrulaması yapar.
+ * Bu sayede sadece Shopify'dan gelen isteklerin kabul edilmesi sağlanır.
+ */
+async function setupHmacMiddleware() {
+  // App Proxy istekleri için HMAC doğrulaması
+  fastify.addHook('preHandler', async (request, reply) => {
+    // Sadece /app-proxy/* istekleri için çalış
+    if (!request.url.startsWith('/app-proxy/')) {
+      return;
+    }
+
+    try {
+      const apiSecret = process.env['SHOPIFY_API_SECRET'];
+      
+      // API Secret kontrolü
+      if (!apiSecret) {
+        logger.error('SHOPIFY_API_SECRET environment variable is missing');
+        return reply.status(500).send({ 
+          error: 'Server configuration error',
+          message: 'API secret not configured'
+        });
+      }
+
+      // HMAC doğrulaması
+      const isValidHmac = verifyProxyHmac(request.query as Record<string, any>, apiSecret);
+      
+      if (!isValidHmac) {
+        logger.warn('Invalid HMAC signature', { 
+          url: request.url,
+          ip: request.ip,
+          userAgent: request.headers['user-agent']
+        });
+        
+        return reply.status(401).send({ 
+          error: 'Unauthorized',
+          message: HMAC_ERRORS.INVALID_HMAC
+        });
+      }
+
+      // Güvenli shop bilgisini al
+      const shop = getShopFromQuery(request.query as Record<string, any>);
+      
+      if (!shop) {
+        logger.warn('Invalid shop format', { 
+          url: request.url,
+          query: request.query
+        });
+        
+        return reply.status(400).send({ 
+          error: 'Bad Request',
+          message: HMAC_ERRORS.INVALID_SHOP
+        });
+      }
+
+      // Shop bilgisini request'e ekle (güvenli)
+      (request as any).shop = shop;
+      
+      logger.debug('HMAC verification successful', { shop, url: request.url });
+      
+    } catch (error) {
+      logger.error('HMAC verification error', { error, url: request.url });
+      return reply.status(500).send({ 
+        error: 'Internal Server Error',
+        message: 'HMAC verification failed'
+      });
+    }
+  });
+}
+
+/**
  * Sistem sağlık kontrolü endpoint'i
  * 
  * Bu endpoint, sistem bileşenlerinin (veritabanı, Redis) sağlık durumunu kontrol eder.
@@ -597,11 +670,8 @@ async function registerRoutes() {
     // App Proxy tracking script endpoint
     fastify.get('/app-proxy/tracking.js', async (request, reply) => {
       try {
-        const shop = request.headers['x-shop'] as string;
-        if (!shop) {
-          reply.status(400).send({ error: 'Shop header required' });
-          return;
-        }
+        // Shop bilgisini güvenli şekilde al (HMAC middleware'den)
+        const shop = (request as any).shop as string;
 
         // Feature flags'i al
         const config = await getAppConfig(shop);
@@ -622,11 +692,8 @@ async function registerRoutes() {
     // App Proxy config endpoint
     fastify.get('/app-proxy/config.json', async (request, reply) => {
       try {
-        const shop = request.headers['x-shop'] as string;
-        if (!shop) {
-          reply.status(400).send({ error: 'Shop header required' });
-          return;
-        }
+        // Shop bilgisini güvenli şekilde al (HMAC middleware'den)
+        const shop = (request as any).shop as string;
 
         const config = await getAppConfig(shop);
         
@@ -643,11 +710,8 @@ async function registerRoutes() {
     // App Proxy collect endpoint
     fastify.post('/app-proxy/collect', async (request, reply) => {
       try {
-        const shop = request.headers['x-shop'] as string;
-        if (!shop) {
-          reply.status(400).send({ error: 'Shop header required' });
-          return;
-        }
+        // Shop bilgisini güvenli şekilde al (HMAC middleware'den)
+        const shop = (request as any).shop as string;
 
         const { event_type, data } = request.body as { event_type: string; data: any };
         
@@ -794,6 +858,10 @@ async function start() {
     // Register plugins and routes
     await registerPlugins();
     await registerRoutes();
+
+    // Setup HMAC middleware
+    await setupHmacMiddleware();
+    logger.info('HMAC middleware configured');
 
     // Setup request tracking
     setupRequestTracking(fastify);
