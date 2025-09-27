@@ -810,9 +810,18 @@ async function registerRoutes() {
       try {
         const { code, shop } = request.query as { code: string; shop: string; state?: string };
         
+        logger.info('OAuth callback received', { 
+          code: code ? 'present' : 'missing', 
+          shop: shop || 'missing',
+          query: request.query 
+        });
+        
         if (!code || !shop) {
-          logger.error('Missing OAuth parameters', { code: !!code, shop: !!shop });
-          return reply.status(400).send({ error: 'Missing required parameters' });
+          logger.error('Missing OAuth parameters', { code: !!code, shop: !!shop, query: request.query });
+          return reply.status(400).send({ 
+            error: 'Missing required parameters',
+            details: { code: !!code, shop: !!shop }
+          });
         }
 
         // Shop domain'ini doğrula
@@ -822,17 +831,32 @@ async function registerRoutes() {
         }
 
         // Access token al
+        logger.info('Attempting to exchange code for token', { shop });
         const accessToken = await exchangeCodeForToken(shop, code);
         
         if (!accessToken) {
-          logger.error('Failed to exchange code for token', { shop });
-          return reply.status(500).send({ error: 'Failed to authenticate' });
+          logger.error('Failed to exchange code for token', { shop, code: code.substring(0, 10) + '...' });
+          return reply.status(500).send({ 
+            error: 'Failed to authenticate',
+            details: 'Token exchange failed'
+          });
         }
 
+        logger.info('Access token obtained successfully', { shop });
+
         // Shop bilgilerini al
+        logger.info('Fetching shop information', { shop });
         const shopInfo = await getShopInfo(shop, accessToken);
         
+        if (!shopInfo) {
+          logger.error('Failed to fetch shop info', { shop });
+          return reply.status(500).send({ 
+            error: 'Failed to fetch shop information'
+          });
+        }
+
         // Veritabanına kaydet
+        logger.info('Saving shop data to database', { shop });
         await saveShopData(shop, accessToken, shopInfo);
 
         logger.info('Shop successfully authenticated', { shop });
@@ -860,8 +884,18 @@ async function registerRoutes() {
         return reply.type('text/html').send(successHtml);
 
       } catch (error) {
-        logger.error('OAuth callback error', { error });
-        return reply.status(500).send({ error: 'Authentication failed' });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        
+        logger.error('OAuth callback error', { 
+          error: errorMessage, 
+          stack: errorStack,
+          query: request.query 
+        });
+        return reply.status(500).send({ 
+          error: 'Authentication failed',
+          details: errorMessage
+        });
       }
     });
 
@@ -1403,33 +1437,71 @@ async function exchangeCodeForToken(shop: string, code: string): Promise<string 
     const clientId = process.env['SHOPIFY_API_KEY'];
     const clientSecret = process.env['SHOPIFY_API_SECRET'];
 
+    logger.info('Token exchange attempt', { 
+      shop, 
+      clientId: clientId ? 'present' : 'missing',
+      clientSecret: clientSecret ? 'present' : 'missing',
+      code: code.substring(0, 10) + '...'
+    });
+
     if (!clientId || !clientSecret) {
-      logger.error('Missing Shopify API credentials');
+      logger.error('Missing Shopify API credentials', { 
+        clientId: !!clientId, 
+        clientSecret: !!clientSecret 
+      });
       return null;
     }
+
+    const requestBody = {
+      client_id: clientId,
+      client_secret: clientSecret,
+      code: code,
+    };
+
+    logger.info('Making token exchange request', { 
+      url: `https://${shop}/admin/oauth/access_token`,
+      body: { ...requestBody, code: '***' }
+    });
 
     const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code: code,
-      }),
+      body: JSON.stringify(requestBody),
+    });
+
+    logger.info('Token exchange response', { 
+      status: response.status, 
+      statusText: response.statusText
     });
 
     if (!response.ok) {
-      logger.error('Token exchange failed', { status: response.status });
+      const errorText = await response.text();
+      logger.error('Token exchange failed', { 
+        status: response.status, 
+        statusText: response.statusText,
+        error: errorText
+      });
       return null;
     }
 
     const data = await response.json();
+    logger.info('Token exchange successful', { 
+      hasAccessToken: !!data.access_token,
+      scope: data.scope
+    });
+    
     return data.access_token || null;
 
   } catch (error) {
-    logger.error('Token exchange error', { error });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    logger.error('Token exchange error', { 
+      error: errorMessage, 
+      stack: errorStack 
+    });
     return null;
   }
 }
