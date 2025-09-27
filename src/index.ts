@@ -1012,7 +1012,9 @@ async function registerRoutes() {
         logger.info('OAuth callback received', { 
           code: code ? 'present' : 'missing', 
           shop: shop || 'missing',
-          query: request.query 
+          query: request.query,
+          fullUrl: request.url,
+          headers: request.headers
         });
         
         if (!code || !shop) {
@@ -1153,8 +1155,16 @@ async function registerRoutes() {
         const redirectUri = `${process.env['SHOPIFY_APP_URL']}/auth/callback`;
         const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics';
         
+        logger.info('OAuth URL generation', {
+          shop,
+          clientId: clientId ? 'present' : 'missing',
+          redirectUri,
+          appUrl: process.env['SHOPIFY_APP_URL']
+        });
+        
         const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=install`;
 
+        logger.info('Generated OAuth URL', { authUrl });
         return reply.redirect(authUrl);
 
       } catch (error) {
@@ -1404,8 +1414,16 @@ async function registerRoutes() {
           const redirectUri = `${process.env['SHOPIFY_APP_URL']}/auth/callback`;
           const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics';
           
+          logger.info('Main route OAuth URL generation', {
+            shop,
+            clientId: clientId ? 'present' : 'missing',
+            redirectUri,
+            appUrl: process.env['SHOPIFY_APP_URL']
+          });
+          
           const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=install`;
           
+          logger.info('Main route generated OAuth URL', { authUrl });
           return reply.redirect(authUrl);
         }
       }
