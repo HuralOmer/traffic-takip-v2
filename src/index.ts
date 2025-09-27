@@ -1441,7 +1441,6 @@ async function start() {
 
     // HMAC middleware geçici olarak devre dışı
     // await setupHmacMiddleware();
-    logger.info('HMAC middleware disabled');
 
     // Setup request tracking
     setupRequestTracking(fastify);
