@@ -836,6 +836,21 @@ async function registerRoutes() {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <script src="https://unpkg.com/@shopify/app-bridge@3"></script>
+            <script>
+              // App Bridge'i başlat
+              if (window.ShopifyAppBridge) {
+                const AppBridge = window.ShopifyAppBridge.default;
+                const createApp = AppBridge.createApp;
+                
+                const app = createApp({
+                  apiKey: '${process.env['SHOPIFY_API_KEY']}',
+                  shopOrigin: '${shop}',
+                });
+                
+                // App Bridge'i global olarak erişilebilir yap
+                window.app = app;
+              }
+            </script>
             <style>
               body { 
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -1045,7 +1060,7 @@ async function registerRoutes() {
 
         logger.info('Shop successfully authenticated', { shop });
 
-        // Embedded app için App Bridge ile yönlendir
+        // Embedded app için doğru yönlendirme
         const successHtml = `
           <!DOCTYPE html>
           <html>
@@ -1069,11 +1084,10 @@ async function registerRoutes() {
           <body>
             <div class="success">✅ Successfully Installed!</div>
             <div class="message">HRL Tracking has been successfully installed to your store.</div>
-            <div class="message">Redirecting to admin dashboard...</div>
-            <div class="redirecting">If you are not redirected automatically, <a href="https://${shop}/admin/apps" target="_top">click here</a>.</div>
+            <div class="message">Redirecting to dashboard...</div>
             
             <script>
-              // App Bridge ile admin'e yönlendir
+              // App Bridge ile embedded app'e yönlendir
               if (window.ShopifyAppBridge) {
                 const AppBridge = window.ShopifyAppBridge.default;
                 const createApp = AppBridge.createApp;
@@ -1083,20 +1097,15 @@ async function registerRoutes() {
                   shopOrigin: '${shop}',
                 });
 
-                // Admin'e yönlendir
+                // Embedded app dashboard'a yönlendir
                 app.dispatch(AppBridge.actions.Redirect.toApp, {
                   path: '/dashboard'
                 });
-                
-                // Alternatif: Admin apps sayfasına yönlendir
-                setTimeout(() => {
-                  window.location.href = 'https://${shop}/admin/apps';
-                }, 1000);
               } else {
-                // Fallback: Admin apps sayfasına yönlendir
+                // Fallback: Doğrudan dashboard'a yönlendir
                 setTimeout(() => {
-                  window.location.href = 'https://${shop}/admin/apps';
-                }, 2000);
+                  window.location.href = '${process.env['SHOPIFY_APP_URL']}/dashboard?shop=${shop}';
+                }, 1000);
               }
             </script>
           </body>
