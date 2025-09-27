@@ -1,15 +1,16 @@
-{%- if settings.enable_tracking -%}
-  {%- comment -%} theme-check-disable AssetUrlFilters RemoteAsset {%- endcomment -%}
-  <script defer src="{{ routes.root_url }}apps/{{ settings.app_proxy_subpath | default: 'app-proxy' }}/tracking.js?v={{ settings.script_version | default: 1 }}"></script>
-  {%- comment -%} theme-check-enable AssetUrlFilters RemoteAsset {%- endcomment -%}
-{%- endif -%}
+{% comment %} theme-check-disable AssetUrlFilters RemoteAsset {% endcomment %}
+<script
+  id="hrl-app-proxy"
+  defer
+  src="https://traffic-takip-production.up.railway.app/app-proxy/tracking.js?shop={{ shop.permanent_domain }}&v={{ settings.script_version | default: 1 }}">
+</script>
+{% comment %} theme-check-enable AssetUrlFilters RemoteAsset {% endcomment %}
 
 {% schema %}
 {
   "name": "HRL Tracking",
   "target": "head",
   "settings": [
-    { "type": "checkbox", "id": "enable_tracking", "label": "Enable", "default": true },
     { "type": "text", "id": "app_proxy_subpath", "label": "App Proxy Subpath", "default": "app-proxy" },
     { "type": "text", "id": "script_version", "label": "Script Version", "default": "1" }
   ]

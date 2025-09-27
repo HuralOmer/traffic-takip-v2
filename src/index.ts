@@ -1320,11 +1320,34 @@ async function registerRoutes() {
 
   // App Proxy routes
   fastify.register(async function (fastify) {
-    // App Proxy tracking script endpoint
+    // App Proxy tracking script endpoint (HMAC olmadan)
     fastify.get('/app-proxy/tracking.js', async (request, reply) => {
       try {
-        // Shop bilgisini güvenli şekilde al (HMAC middleware'den)
-        const shop = (request as any).shop as string;
+        // Shop bilgisini query'den al
+        const { shop } = request.query as { shop?: string };
+        
+        if (!shop || !shop.endsWith('.myshopify.com')) {
+          // Default config ile script oluştur
+          const defaultConfig = {
+            shop: 'unknown',
+            endpoints: {
+              collect: `${process.env['SHOPIFY_APP_URL']}/collect`,
+              config: `${process.env['SHOPIFY_APP_URL']}/app-proxy/config.json`
+            },
+            features: {
+              tracking: true,
+              analytics: true
+            }
+          };
+          
+          const trackingScript = generateTrackingScript(defaultConfig);
+          
+          reply
+            .type('application/javascript')
+            .header('Cache-Control', 'public, max-age=300')
+            .send(trackingScript);
+          return;
+        }
 
         // Feature flags'i al
         const config = await getAppConfig(shop);
