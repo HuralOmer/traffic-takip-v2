@@ -800,6 +800,189 @@ fastify.get('/metrics', async (_request, reply) => {
  */
 async function registerRoutes() {
   /**
+   * Shopify Embedded App Routes
+   * 
+   * Shopify admin panelinde embedded olarak çalışan uygulama için gerekli route'lar.
+   */
+  fastify.register(async function (fastify) {
+    // Dashboard route for embedded app
+    fastify.get('/dashboard', async (request, reply) => {
+      try {
+        const { shop, host } = request.query as { 
+          shop?: string; 
+          hmac?: string; 
+          host?: string; 
+          timestamp?: string; 
+        };
+
+        if (!shop || !shop.endsWith('.myshopify.com')) {
+          return reply.status(400).send({ error: 'Invalid shop parameter' });
+        }
+
+        // Check if shop is installed
+        const { data: shopData } = await db.getClient()
+          .from('shops')
+          .select('*')
+          .eq('shop_domain', shop)
+          .single();
+
+        if (!shopData) {
+          return reply.status(404).send({ error: 'Shop not found' });
+        }
+
+        // Embedded app HTML
+        const dashboardHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>HRL Tracking Dashboard</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <script src="https://unpkg.com/@shopify/app-bridge@3"></script>
+            <style>
+              body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                margin: 0; 
+                padding: 20px; 
+                background: #f6f6f7;
+              }
+              .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 8px;
+                padding: 24px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+              }
+              .header {
+                border-bottom: 1px solid #e1e3e5;
+                padding-bottom: 16px;
+                margin-bottom: 24px;
+              }
+              .title {
+                font-size: 24px;
+                font-weight: 600;
+                color: #202223;
+                margin: 0;
+              }
+              .subtitle {
+                color: #6d7175;
+                margin: 4px 0 0 0;
+              }
+              .stats-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 16px;
+                margin-bottom: 24px;
+              }
+              .stat-card {
+                background: #f6f6f7;
+                padding: 16px;
+                border-radius: 6px;
+                border-left: 4px solid #008060;
+              }
+              .stat-value {
+                font-size: 24px;
+                font-weight: 600;
+                color: #202223;
+                margin: 0;
+              }
+              .stat-label {
+                color: #6d7175;
+                font-size: 14px;
+                margin: 4px 0 0 0;
+              }
+              .section {
+                margin-bottom: 32px;
+              }
+              .section-title {
+                font-size: 18px;
+                font-weight: 600;
+                color: #202223;
+                margin: 0 0 16px 0;
+              }
+              .status-badge {
+                display: inline-block;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                font-weight: 500;
+                background: #d4edda;
+                color: #155724;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h1 class="title">HRL Tracking Dashboard</h1>
+                <p class="subtitle">Shop: ${shop}</p>
+                <span class="status-badge">Active</span>
+              </div>
+              
+              <div class="stats-grid">
+                <div class="stat-card">
+                  <p class="stat-value">0</p>
+                  <p class="stat-label">Active Users</p>
+                </div>
+                <div class="stat-card">
+                  <p class="stat-value">0</p>
+                  <p class="stat-label">Page Views</p>
+                </div>
+                <div class="stat-card">
+                  <p class="stat-value">0</p>
+                  <p class="stat-label">Sessions</p>
+                </div>
+                <div class="stat-card">
+                  <p class="stat-value">0</p>
+                  <p class="stat-label">Conversions</p>
+                </div>
+              </div>
+
+              <div class="section">
+                <h2 class="section-title">Recent Activity</h2>
+                <p style="color: #6d7175;">No recent activity to display.</p>
+              </div>
+
+              <div class="section">
+                <h2 class="section-title">Settings</h2>
+                <p style="color: #6d7175;">App settings will be available here.</p>
+              </div>
+            </div>
+
+            <script>
+              // Initialize Shopify App Bridge
+              if (window.ShopifyAppBridge) {
+                const AppBridge = window.ShopifyAppBridge.default;
+                const createApp = AppBridge.createApp;
+                
+                const app = createApp({
+                  apiKey: '${process.env['SHOPIFY_API_KEY']}',
+                  shopOrigin: '${shop}',
+                  host: '${host}',
+                });
+
+                // Set app title
+                app.dispatch(AppBridge.actions.TitleBar.set, {
+                  title: 'HRL Tracking'
+                });
+              }
+            </script>
+          </body>
+          </html>
+        `;
+
+        return reply.type('text/html').send(dashboardHtml);
+
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error('Dashboard error', { error: errorMessage });
+        return reply.status(500).send({ error: 'Dashboard error' });
+      }
+    });
+  });
+
+  /**
    * Shopify OAuth Routes
    * 
    * Uygulamanın Shopify mağazalarına yüklenmesi için gerekli OAuth akışı.
