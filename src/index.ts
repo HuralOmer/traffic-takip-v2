@@ -1351,6 +1351,25 @@ async function registerRoutes() {
         reply.status(400).send({ error: 'Invalid event data' });
       }
     });
+
+    // App Proxy collect endpoint (without HMAC for theme extension)
+    fastify.post('/collect', async (request, reply) => {
+      try {
+        const { type, shop, ...data } = request.body as any;
+        
+        if (!shop) {
+          return reply.status(400).send({ error: 'Shop parameter required' });
+        }
+
+        // Event'i işle
+        await processTrackingEvent(shop, type, data);
+        
+        reply.send({ success: true, message: 'Event recorded' });
+      } catch (error) {
+        logger.error('Event collection failed', { error });
+        reply.status(400).send({ error: 'Invalid event data' });
+      }
+    });
   });
 
   // Main app route - OAuth flow starter

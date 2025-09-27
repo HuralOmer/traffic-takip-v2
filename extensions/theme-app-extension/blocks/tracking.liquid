@@ -1,6 +1,6 @@
 {%- if settings.enable_tracking -%}
   <!-- HRL Traffic Tracking Script -->
-  <script defer src="{{ '/apps/' | append: settings.app_proxy_subpath | default: 'app-proxy' | append: '/tracking.js' | asset_url }}?v={{ settings.script_version | default: 1 }}"></script>
+  <script defer src="{{ 'tracking-main.js' | asset_url }}?v={{ settings.script_version | default: 1 }}"></script>
 {%- endif -%}
 
 {% schema %}

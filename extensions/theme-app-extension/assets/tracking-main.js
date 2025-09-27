@@ -61,23 +61,29 @@
     
     // Konfigürasyon yükle
     loadConfig: function() {
-      const script = document.querySelector('script[src*="tracking.js"]');
-      if (script) {
-        const url = new URL(script.src);
-        const baseUrl = url.origin + url.pathname.replace('/tracking.js', '');
-        
-        this.config = {
-          baseUrl: baseUrl,
-          endpoints: {
-            collect: baseUrl + '/collect',
-            config: baseUrl + '/config.json'
-          },
-          shop: window.Shopify?.shop || 'unknown',
-          timestamp: Date.now()
-        };
-        
-        console.log('📋 HRL Tracking: Konfigürasyon yüklendi', this.config);
+      // Shopify shop bilgisini al
+      const shop = window.Shopify?.shop || this.getShopFromUrl() || 'unknown';
+      
+      this.config = {
+        baseUrl: window.location.origin,
+        endpoints: {
+          collect: window.location.origin + '/collect',
+          config: window.location.origin + '/config.json'
+        },
+        shop: shop,
+        timestamp: Date.now()
+      };
+      
+      console.log('📋 HRL Tracking: Konfigürasyon yüklendi', this.config);
+    },
+    
+    // URL'den shop bilgisini al
+    getShopFromUrl: function() {
+      const hostname = window.location.hostname;
+      if (hostname.includes('.myshopify.com')) {
+        return hostname;
       }
+      return null;
     },
     
     // Event listener'ları kur
