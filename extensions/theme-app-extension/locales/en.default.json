@@ -1,0 +1,8 @@
+{
+  "hrl_tracking": {
+    "name": "HRL Tracking",
+    "enable_tracking": "Enable Tracking",
+    "app_proxy_subpath": "App Proxy Subpath",
+    "script_version": "Script Version"
+  }
+}
