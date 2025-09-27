@@ -1,16 +1,19 @@
-# shopify.app.toml
-name = "traffic-takip"
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
 client_id = "b1ff4db0087606d8bacc80ca886d15f6"
+name = "traffic-takip"
 application_url = "https://traffic-takip-production.up.railway.app"
 embedded = true
 
-[auth]
-redirect_urls = ["https://traffic-takip-production.up.railway.app/auth/callback"]
-
-[app_proxy]
-prefix = "apps"
-subpath = "app-proxy"
-url = "https://traffic-takip-production.up.railway.app/app-proxy"
-
 [webhooks]
 api_version = "2025-07"
+
+[auth]
+redirect_urls = [
+  "https://traffic-takip-production.up.railway.app/auth/callback"
+]
+
+[app_proxy]
+url = "https://traffic-takip-production.up.railway.app/app-proxy"
+subpath = "app-proxy"
+prefix = "apps"
