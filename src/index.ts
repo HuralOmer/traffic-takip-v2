@@ -882,7 +882,7 @@ async function registerRoutes() {
         // OAuth URL oluştur
         const clientId = process.env['SHOPIFY_API_KEY'];
         const redirectUri = `${process.env['SHOPIFY_APP_URL']}/auth/callback`;
-        const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics,write_analytics';
+        const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics';
         
         const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=install`;
 
@@ -1114,7 +1114,7 @@ async function registerRoutes() {
           // Shop yüklü değil, OAuth akışını başlat
           const clientId = process.env['SHOPIFY_API_KEY'];
           const redirectUri = `${process.env['SHOPIFY_APP_URL']}/auth/callback`;
-          const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics,write_analytics';
+          const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics';
           
           const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=install`;
           
