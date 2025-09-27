@@ -7,12 +7,16 @@ api_version = "2023-10"
 type = "theme"
 name = "HRL Traffic Tracking"
 
+# Otomatik enjeksiyon ayarları
+[extensions.targeting]
+target = "head"
+
 [extensions.settings]
 [extensions.settings.app_proxy_subpath]
 type = "single_line_text_field"
 id = "app_proxy_subpath"
 label = "App Proxy Subpath"
-default = "hrl-proxy"
+default = "app-proxy"
 help_text = "App Proxy alt yolu (örn: hrl-proxy)"
 
 [extensions.settings.enable_tracking]

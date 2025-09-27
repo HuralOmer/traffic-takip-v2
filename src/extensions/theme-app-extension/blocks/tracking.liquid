@@ -21,7 +21,7 @@
   App Proxy subpath'i ayarlardan al
   Eğer ayarlanmamışsa varsayılan değer kullan
 {% endcomment %}
-{% assign app_proxy_subpath = settings.app_proxy_subpath | default: 'hrl-proxy' %}
+{% assign app_proxy_subpath = settings.app_proxy_subpath | default: 'app-proxy' %}
 {% assign script_version = settings.script_version | default: 1 %}
 
 {% comment %}
@@ -53,7 +53,7 @@
   function loadTrackingScript() {
     return new Promise((resolve, reject) => {
       const versionParam = config.version ? `?v=${config.version}` : '';
-      const scriptUrl = `https://${config.shop}${config.proxyPath}${versionParam}`;
+      const scriptUrl = `https://${config.shop}/${config.proxyPath}${versionParam}`;
       
       const script = document.createElement('script');
       script.src = scriptUrl;
@@ -105,12 +105,8 @@
     loadTrackingScript().catch(createFallback);
   }
   
-  // Script'i başlat
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+  // Script'i hemen başlat (head içinde olduğu için)
+  init();
 })();
 </script>
 
@@ -149,7 +145,7 @@
 {% schema %}
 {
   "name": "HRL Traffic Tracking",
-  "target": "section",
+  "target": "head",
   "category": "Analytics",
   "settings": [
     {
