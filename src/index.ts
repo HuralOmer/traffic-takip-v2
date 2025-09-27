@@ -1537,6 +1537,12 @@ async function getShopInfo(shop: string, accessToken: string): Promise<any> {
  */
 async function saveShopData(shop: string, accessToken: string, shopInfo: any): Promise<void> {
   try {
+    logger.info('Attempting to save shop data', { 
+      shop, 
+      hasShopInfo: !!shopInfo,
+      shopName: shopInfo?.name 
+    });
+
     const { error } = await db.getClient()
       .from('shops')
       .upsert({
@@ -1551,14 +1557,37 @@ async function saveShopData(shop: string, accessToken: string, shopInfo: any): P
       });
 
     if (error) {
-      logger.error('Failed to save shop data', { error });
+      logger.error('Failed to save shop data', { 
+        error: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      
+      // If table doesn't exist, log warning but don't fail
+      if (error.code === 'PGRST116' || error.message.includes('relation "shops" does not exist')) {
+        logger.warn('Shops table does not exist, skipping database save', { shop });
+        return;
+      }
+      
       throw error;
     }
 
     logger.info('Shop data saved successfully', { shop });
 
   } catch (error) {
-    logger.error('Save shop data error', { error });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error('Save shop data error', { 
+      error: errorMessage,
+      shop 
+    });
+    
+    // Don't throw error for missing table, just log warning
+    if (errorMessage.includes('relation "shops" does not exist')) {
+      logger.warn('Shops table does not exist, continuing without database save', { shop });
+      return;
+    }
+    
     throw error;
   }
 }
