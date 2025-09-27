@@ -1361,16 +1361,16 @@ async function registerRoutes() {
       }
     });
 
-    // App Proxy collect endpoint
+    // App Proxy collect endpoint (with HMAC for Shopify requests)
     fastify.post('/app-proxy/collect', async (request, reply) => {
       try {
         // Shop bilgisini güvenli şekilde al (HMAC middleware'den)
         const shop = (request as any).shop as string;
 
-        const { event_type, data } = request.body as { event_type: string; data: any };
+        const { type, ...data } = request.body as any;
         
         // Event'i işle
-        await processTrackingEvent(shop, event_type, data);
+        await processTrackingEvent(shop, type, data);
         
         reply.send({ success: true, message: 'Event recorded' });
       } catch (error) {
