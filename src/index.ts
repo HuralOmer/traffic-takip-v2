@@ -68,6 +68,287 @@ async function getAppConfig(shop: string) {
 }
 
 /**
+ * Dashboard HTML'ini oluşturur
+ * @param shop - Mağaza kimliği
+ * @returns Dashboard HTML
+ */
+function generateDashboardHtml(shop: string): string {
+  return `
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HRL Traffic Tracking - Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .dashboard-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            margin: 0 auto 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            font-size: 16px;
+            margin-bottom: 40px;
+        }
+        
+        .status-card {
+            background: #f7fafc;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-left: 4px solid #e2e8f0;
+        }
+        
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-running .status-dot {
+            background: #48bb78;
+        }
+        
+        .status-error .status-dot {
+            background: #f56565;
+        }
+        
+        .status-inactive .status-dot {
+            background: #ed8936;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .metric {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2d3748;
+        }
+        
+        .metric-label {
+            color: #718096;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .loading {
+            display: none;
+        }
+        
+        .loading.show {
+            display: block;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            color: #f56565;
+            background: #fed7d7;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+        
+        .success-message {
+            color: #48bb78;
+            background: #c6f6d5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="logo">HRL</div>
+        <h1 class="title">Traffic Tracking Dashboard</h1>
+        <p class="subtitle">Mağaza: ${shop}</p>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Uygulama durumu kontrol ediliyor...</p>
+        </div>
+        
+        <div class="status-card" id="statusCard" style="display: none;">
+            <div class="status-indicator" id="statusIndicator">
+                <div class="status-dot"></div>
+                <span id="statusText">Kontrol ediliyor...</span>
+            </div>
+            
+            <div id="statusMessage"></div>
+            
+            <div class="metrics" id="metrics" style="display: none;">
+                <div class="metric">
+                    <div class="metric-value" id="activeUsers">-</div>
+                    <div class="metric-label">Aktif Kullanıcı</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value" id="activeSessions">-</div>
+                    <div class="metric-label">Aktif Oturum</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function checkAppStatus() {
+            const loading = document.getElementById('loading');
+            const statusCard = document.getElementById('statusCard');
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            const statusMessage = document.getElementById('statusMessage');
+            const metrics = document.getElementById('metrics');
+            const activeUsers = document.getElementById('activeUsers');
+            const activeSessions = document.getElementById('activeSessions');
+            
+            try {
+                loading.classList.add('show');
+                statusCard.style.display = 'none';
+                
+                const response = await fetch('/api/dashboard/status');
+                const data = await response.json();
+                
+                loading.classList.remove('show');
+                statusCard.style.display = 'block';
+                
+                if (data.success) {
+                    const { app_status, tracking_status, metrics: appMetrics } = data.data;
+                    
+                    // Uygulama durumu
+                    if (app_status === 'running') {
+                        statusIndicator.className = 'status-indicator status-running';
+                        statusText.textContent = 'Uygulama Başarıyla Çalışıyor!';
+                        statusMessage.innerHTML = '<div class="success-message">✅ Tüm sistemler aktif ve çalışıyor.</div>';
+                    } else {
+                        statusIndicator.className = 'status-indicator status-error';
+                        statusText.textContent = 'Uygulama Hatası';
+                        statusMessage.innerHTML = '<div class="error-message">❌ Uygulama çalışmıyor. Lütfen destek ile iletişime geçin.</div>';
+                    }
+                    
+                    // Tracking durumu
+                    if (tracking_status === 'active') {
+                        statusMessage.innerHTML += '<div class="success-message">📊 Trafik takibi aktif - Veriler toplanıyor.</div>';
+                        metrics.style.display = 'grid';
+                        activeUsers.textContent = appMetrics.active_users || 0;
+                        activeSessions.textContent = appMetrics.active_sessions || 0;
+                    } else {
+                        statusMessage.innerHTML += '<div class="error-message">⚠️ Trafik takibi henüz aktif değil. Mağaza ziyaretçileri bekleniyor.</div>';
+                    }
+                    
+                } else {
+                    statusIndicator.className = 'status-indicator status-error';
+                    statusText.textContent = 'Durum Kontrolü Başarısız';
+                    statusMessage.innerHTML = '<div class="error-message">❌ Uygulama durumu kontrol edilemedi.</div>';
+                }
+                
+            } catch (error) {
+                loading.classList.remove('show');
+                statusCard.style.display = 'block';
+                
+                statusIndicator.className = 'status-indicator status-error';
+                statusText.textContent = 'Bağlantı Hatası';
+                statusMessage.innerHTML = '<div class="error-message">❌ Sunucuya bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.</div>';
+                
+                console.error('Dashboard error:', error);
+            }
+        }
+        
+        // Sayfa yüklendiğinde durumu kontrol et
+        document.addEventListener('DOMContentLoaded', checkAppStatus);
+        
+        // Her 30 saniyede bir güncelle
+        setInterval(checkAppStatus, 30000);
+    </script>
+</body>
+</html>
+  `;
+}
+
+/**
  * Tracking script'ini oluşturur
  * @param config - App konfigürasyonu
  * @returns JavaScript tracking script
@@ -722,6 +1003,75 @@ async function registerRoutes() {
       } catch (error) {
         logger.error('Event collection failed', { error });
         reply.status(400).send({ error: 'Invalid event data' });
+      }
+    });
+  });
+
+  // Dashboard routes
+  fastify.register(async function (fastify) {
+    // Dashboard ana sayfa
+    fastify.get('/dashboard', async (request, reply) => {
+      try {
+        const shop = (request as any).shop as string;
+        if (!shop) {
+          reply.status(400).send({ error: 'Shop header required' });
+          return;
+        }
+
+        // Dashboard HTML'i oluştur
+        const dashboardHtml = generateDashboardHtml(shop);
+        
+        reply
+          .type('text/html')
+          .header('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' https:; frame-ancestors https://*.myshopify.com https://admin.shopify.com;")
+          .send(dashboardHtml);
+      } catch (error) {
+        logger.error('Dashboard generation failed', { error });
+        reply.status(500).send({ error: 'Dashboard generation failed' });
+      }
+    });
+
+    // Dashboard API - Uygulama durumu
+    fastify.get('/api/dashboard/status', async (request, reply) => {
+      try {
+        const shop = (request as any).shop as string;
+        if (!shop) {
+          reply.status(400).send({ error: 'Shop header required' });
+          return;
+        }
+
+        // Sistem durumunu kontrol et
+        const health = await getHealthStatus();
+        const activeUsers = await redis.getActiveUsers(shop);
+        const activeSessions = await redis.getActiveSessions(shop);
+
+        // Uygulama durumu
+        const isHealthy = health.status === 'healthy';
+        const isTrackingActive = activeUsers > 0 || activeSessions > 0;
+
+        reply.send({
+          success: true,
+          data: {
+            app_status: isHealthy ? 'running' : 'error',
+            tracking_status: isTrackingActive ? 'active' : 'inactive',
+            health: health,
+            metrics: {
+              active_users: activeUsers,
+              active_sessions: activeSessions,
+              timestamp: new Date().toISOString()
+            }
+          }
+        });
+      } catch (error) {
+        logger.error('Dashboard status check failed', { error });
+        reply.status(500).send({ 
+          success: false,
+          error: 'Status check failed',
+          data: {
+            app_status: 'error',
+            tracking_status: 'unknown'
+          }
+        });
       }
     });
   });
