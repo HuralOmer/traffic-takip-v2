@@ -677,19 +677,19 @@ async function registerRoutes() {
               
               <div class="stats-grid">
                 <div class="stat-card">
-                  <p class="stat-value">0</p>
+                  <p class="stat-value" id="activeUsers">-</p>
                   <p class="stat-label">Active Users</p>
                 </div>
                 <div class="stat-card">
-                  <p class="stat-value">0</p>
+                  <p class="stat-value" id="pageViews">-</p>
                   <p class="stat-label">Page Views</p>
                 </div>
                 <div class="stat-card">
-                  <p class="stat-value">0</p>
+                  <p class="stat-value" id="sessions">-</p>
                   <p class="stat-label">Sessions</p>
                 </div>
                 <div class="stat-card">
-                  <p class="stat-value">0</p>
+                  <p class="stat-value" id="conversions">-</p>
                   <p class="stat-label">Conversions</p>
                 </div>
               </div>
@@ -722,6 +722,30 @@ async function registerRoutes() {
                   title: 'HRL Tracking'
                 });
               }
+
+              // Load dashboard data
+              async function loadDashboardData() {
+                try {
+                  const response = await fetch('/api/dashboard/status?shop=${shop}');
+                  const data = await response.json();
+                  
+                  if (data.success) {
+                    const metrics = data.data.metrics;
+                    document.getElementById('activeUsers').textContent = metrics.active_users || 0;
+                    document.getElementById('sessions').textContent = metrics.active_sessions || 0;
+                    document.getElementById('pageViews').textContent = '0'; // TODO: Implement page views count
+                    document.getElementById('conversions').textContent = '0'; // TODO: Implement conversions count
+                  }
+                } catch (error) {
+                  console.error('Failed to load dashboard data:', error);
+                }
+              }
+
+              // Load data on page load
+              loadDashboardData();
+              
+              // Refresh data every 30 seconds
+              setInterval(loadDashboardData, 30000);
             </script>
           </body>
           </html>
@@ -1213,9 +1237,10 @@ async function registerRoutes() {
     // Dashboard API - Uygulama durumu
     fastify.get('/api/dashboard/status', async (request, reply) => {
       try {
-        const shop = (request as any).shop as string;
+        // Shop bilgisini query parametresinden al (embedded app için)
+        const { shop } = request.query as { shop?: string };
         if (!shop) {
-          reply.status(400).send({ error: 'Shop header required' });
+          reply.status(400).send({ error: 'Shop parameter required' });
           return;
         }
 
