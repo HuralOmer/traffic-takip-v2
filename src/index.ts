@@ -1100,23 +1100,28 @@ async function registerRoutes() {
             <script>
               // App Bridge ile dashboard'a yönlendir
               if (window.ShopifyAppBridge) {
-                const AppBridge = window.ShopifyAppBridge.default;
-                const createApp = AppBridge.createApp;
-                
-                const app = createApp({
-                  apiKey: '${process.env['SHOPIFY_API_KEY']}',
-                  shopOrigin: '${shop}',
-                });
+                try {
+                  const AppBridge = window.ShopifyAppBridge.default;
+                  const createApp = AppBridge.createApp;
+                  
+                  const app = createApp({
+                    apiKey: '${process.env['SHOPIFY_API_KEY']}',
+                    shopOrigin: '${shop}',
+                  });
 
-                // Dashboard'a yönlendir
-                app.dispatch(AppBridge.actions.Redirect.toApp, {
-                  path: '/dashboard'
-                });
+                  // Dashboard'a yönlendir
+                  app.dispatch(AppBridge.actions.Redirect.toApp, {
+                    path: '/dashboard'
+                  });
+                } catch (error) {
+                  console.error('App Bridge error:', error);
+                  // Fallback: Doğrudan dashboard'a yönlendir
+                  window.location.href = '/dashboard?shop=${shop}';
+                }
               } else {
                 // Fallback: Doğrudan dashboard'a yönlendir
-                setTimeout(() => {
-                  window.location.href = '/dashboard?shop=${shop}';
-                }, 1000);
+                console.log('App Bridge not available, using fallback');
+                window.location.href = '/dashboard?shop=${shop}';
               }
             </script>
           </body>
@@ -1406,7 +1411,26 @@ async function registerRoutes() {
 
       // Eğer shop parametresi varsa, OAuth akışını başlat
       if (shop && shop.endsWith('.myshopify.com')) {
-        // Embedded app için her zaman OAuth akışını başlat
+        // Shop'un zaten yüklü olup olmadığını kontrol et
+        try {
+          const { data: existingShop } = await db.getClient()
+            .from('shops')
+            .select('*')
+            .eq('shop_domain', shop)
+            .single();
+
+          if (existingShop) {
+            // Shop zaten yüklü, dashboard'a yönlendir
+            logger.info('Shop already installed, redirecting to dashboard', { shop });
+            const dashboardUrl = `/dashboard?shop=${shop}`;
+            return reply.redirect(dashboardUrl);
+          }
+        } catch (error) {
+          // Database hatası olsa bile OAuth'u başlat
+          logger.warn('Database check failed, proceeding with OAuth', { shop, error });
+        }
+
+        // Shop yüklü değil, OAuth akışını başlat
         const clientId = process.env['SHOPIFY_API_KEY'];
         const redirectUri = `${process.env['SHOPIFY_APP_URL']}/auth/callback`;
         const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics';
