@@ -14,5 +14,6 @@ handle = "hrl-traffic-tracking"
 # Otomatik enjeksiyon ayarları
 [extensions.targeting]
 target = "head"
+auto_inject = true
 
 [extensions.settings]
