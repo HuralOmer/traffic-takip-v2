@@ -1021,7 +1021,7 @@ async function registerRoutes() {
           logger.error('Missing OAuth parameters', { code: !!code, shop: !!shop, query: request.query });
           return reply.status(400).send({ 
             error: 'Missing required parameters',
-            details: { code: !!code, shop: !!shop }
+            details: { code: !!code, shop: !!shop, query: request.query }
           });
         }
 
@@ -1036,10 +1036,15 @@ async function registerRoutes() {
         const accessToken = await exchangeCodeForToken(shop, code);
         
         if (!accessToken) {
-          logger.error('Failed to exchange code for token', { shop, code: code.substring(0, 10) + '...' });
+          logger.error('Failed to exchange code for token', { 
+            shop, 
+            code: code.substring(0, 10) + '...',
+            clientId: process.env['SHOPIFY_API_KEY'] ? 'present' : 'missing',
+            clientSecret: process.env['SHOPIFY_API_SECRET'] ? 'present' : 'missing'
+          });
           return reply.status(500).send({ 
             error: 'Failed to authenticate',
-            details: 'Token exchange failed'
+            details: 'Token exchange failed - check API credentials'
           });
         }
 
@@ -1050,9 +1055,13 @@ async function registerRoutes() {
         const shopInfo = await getShopInfo(shop, accessToken);
         
         if (!shopInfo) {
-          logger.error('Failed to fetch shop info', { shop });
+          logger.error('Failed to fetch shop info', { 
+            shop,
+            accessToken: accessToken ? 'present' : 'missing'
+          });
           return reply.status(500).send({ 
-            error: 'Failed to fetch shop information'
+            error: 'Failed to fetch shop information',
+            details: 'Could not retrieve shop data from Shopify API'
           });
         }
 
