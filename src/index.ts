@@ -1372,7 +1372,7 @@ async function registerRoutes() {
   // Main app route - OAuth flow starter
   fastify.get('/', async (request, reply) => {
     try {
-      const { shop, hmac, host, timestamp } = request.query as { 
+      const { shop } = request.query as { 
         shop?: string; 
         hmac?: string; 
         host?: string; 
