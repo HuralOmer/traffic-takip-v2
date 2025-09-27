@@ -72,6 +72,8 @@ async function getAppConfig(shop: string) {
  * @param shop - Mağaza kimliği
  * @returns Dashboard HTML
  */
+// Unused function removed to fix compilation error
+/*
 function generateDashboardHtml(shop: string): string {
   return `
 <!DOCTYPE html>
@@ -347,6 +349,7 @@ function generateDashboardHtml(shop: string): string {
 </html>
   `;
 }
+*/
 
 /**
  * Tracking script'ini oluşturur
@@ -1367,30 +1370,8 @@ async function registerRoutes() {
     }
   });
 
-  // Dashboard routes
+  // Dashboard API routes (keeping only API endpoints, removing duplicate /dashboard route)
   fastify.register(async function (fastify) {
-    // Dashboard ana sayfa
-    fastify.get('/dashboard', async (request, reply) => {
-      try {
-        const shop = (request as any).shop as string;
-        if (!shop) {
-          reply.status(400).send({ error: 'Shop header required' });
-          return;
-        }
-
-        // Dashboard HTML'i oluştur
-        const dashboardHtml = generateDashboardHtml(shop);
-        
-        reply
-          .type('text/html')
-          .header('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' https:; frame-ancestors https://*.myshopify.com https://admin.shopify.com;")
-          .send(dashboardHtml);
-      } catch (error) {
-        logger.error('Dashboard generation failed', { error });
-        reply.status(500).send({ error: 'Dashboard generation failed' });
-      }
-    });
-
     // Dashboard API - Uygulama durumu
     fastify.get('/api/dashboard/status', async (request, reply) => {
       try {
