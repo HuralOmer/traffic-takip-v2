@@ -789,22 +789,6 @@ fastify.get('/metrics', async (_request, reply) => {
   }
 });
 
-/**
- * Ana endpoint (root)
- * 
- * Uygulamanın temel bilgilerini döndürür.
- * API'nin çalışıp çalışmadığını kontrol etmek için kullanılır.
- * 
- * @returns {Object} Uygulama bilgileri
- */
-fastify.get('/', async (_request, reply) => {
-  reply.send({
-    name: 'Shopify Tracking App',
-    version: '1.0.0',
-    status: 'running',
-    timestamp: new Date().toISOString(),
-  });
-});
 
 /**
  * API route'larını kaydet
