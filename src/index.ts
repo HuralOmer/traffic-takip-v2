@@ -816,6 +816,102 @@ fastify.get('/', async (_request, reply) => {
  */
 async function registerRoutes() {
   /**
+   * Shopify OAuth Routes
+   * 
+   * Uygulamanın Shopify mağazalarına yüklenmesi için gerekli OAuth akışı.
+   */
+  fastify.register(async function (fastify) {
+    // OAuth callback endpoint
+    fastify.get('/auth/callback', async (request, reply) => {
+      try {
+        const { code, shop } = request.query as { code: string; shop: string; state?: string };
+        
+        if (!code || !shop) {
+          logger.error('Missing OAuth parameters', { code: !!code, shop: !!shop });
+          return reply.status(400).send({ error: 'Missing required parameters' });
+        }
+
+        // Shop domain'ini doğrula
+        if (!shop.endsWith('.myshopify.com')) {
+          logger.error('Invalid shop domain', { shop });
+          return reply.status(400).send({ error: 'Invalid shop domain' });
+        }
+
+        // Access token al
+        const accessToken = await exchangeCodeForToken(shop, code);
+        
+        if (!accessToken) {
+          logger.error('Failed to exchange code for token', { shop });
+          return reply.status(500).send({ error: 'Failed to authenticate' });
+        }
+
+        // Shop bilgilerini al
+        const shopInfo = await getShopInfo(shop, accessToken);
+        
+        // Veritabanına kaydet
+        await saveShopData(shop, accessToken, shopInfo);
+
+        logger.info('Shop successfully authenticated', { shop });
+
+        // Başarılı yükleme sayfası
+        const successHtml = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>HRL Tracking - Successfully Installed</title>
+            <style>
+              body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+              .success { color: #28a745; font-size: 24px; margin-bottom: 20px; }
+              .message { color: #666; font-size: 16px; }
+            </style>
+          </head>
+          <body>
+            <div class="success">✅ Successfully Installed!</div>
+            <div class="message">HRL Tracking has been successfully installed to your store.</div>
+            <div class="message">You can now close this window and return to your Shopify admin.</div>
+          </body>
+          </html>
+        `;
+
+        return reply.type('text/html').send(successHtml);
+
+      } catch (error) {
+        logger.error('OAuth callback error', { error });
+        return reply.status(500).send({ error: 'Authentication failed' });
+      }
+    });
+
+    // App installation redirect
+    fastify.get('/auth/install', async (request, reply) => {
+      try {
+        const { shop } = request.query as { shop: string };
+        
+        if (!shop) {
+          return reply.status(400).send({ error: 'Shop parameter required' });
+        }
+
+        // Shop domain'ini doğrula
+        if (!shop.endsWith('.myshopify.com')) {
+          return reply.status(400).send({ error: 'Invalid shop domain' });
+        }
+
+        // OAuth URL oluştur
+        const clientId = process.env['SHOPIFY_API_KEY'];
+        const redirectUri = `${process.env['SHOPIFY_APP_URL']}/auth/callback`;
+        const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics,write_analytics';
+        
+        const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=install`;
+
+        return reply.redirect(authUrl);
+
+      } catch (error) {
+        logger.error('Install redirect error', { error });
+        return reply.status(500).send({ error: 'Installation failed' });
+      }
+    });
+  });
+
+  /**
    * Presence Tracking Route'ları
    * 
    * Kullanıcıların gerçek zamanlı varlığını takip eder.
@@ -1232,6 +1328,106 @@ async function start() {
   } catch (error) {
     logger.error('Failed to start server', { error });
     process.exit(1);
+  }
+}
+
+/**
+ * OAuth Helper Functions
+ */
+
+/**
+ * Authorization code'u access token ile değiştir
+ */
+async function exchangeCodeForToken(shop: string, code: string): Promise<string | null> {
+  try {
+    const clientId = process.env['SHOPIFY_API_KEY'];
+    const clientSecret = process.env['SHOPIFY_API_SECRET'];
+
+    if (!clientId || !clientSecret) {
+      logger.error('Missing Shopify API credentials');
+      return null;
+    }
+
+    const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code: code,
+      }),
+    });
+
+    if (!response.ok) {
+      logger.error('Token exchange failed', { status: response.status });
+      return null;
+    }
+
+    const data = await response.json();
+    return data.access_token || null;
+
+  } catch (error) {
+    logger.error('Token exchange error', { error });
+    return null;
+  }
+}
+
+/**
+ * Shop bilgilerini al
+ */
+async function getShopInfo(shop: string, accessToken: string): Promise<any> {
+  try {
+    const response = await fetch(`https://${shop}/admin/api/2025-07/shop.json`, {
+      headers: {
+        'X-Shopify-Access-Token': accessToken,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      logger.error('Shop info fetch failed', { status: response.status });
+      return null;
+    }
+
+    const data = await response.json();
+    return data.shop;
+
+  } catch (error) {
+    logger.error('Shop info error', { error });
+    return null;
+  }
+}
+
+/**
+ * Shop verilerini veritabanına kaydet
+ */
+async function saveShopData(shop: string, accessToken: string, shopInfo: any): Promise<void> {
+  try {
+    const { error } = await db.getClient()
+      .from('shops')
+      .upsert({
+        shop_domain: shop,
+        access_token: accessToken,
+        shop_name: shopInfo?.name || '',
+        shop_email: shopInfo?.email || '',
+        shop_currency: shopInfo?.currency || '',
+        shop_timezone: shopInfo?.timezone || '',
+        installed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+
+    if (error) {
+      logger.error('Failed to save shop data', { error });
+      throw error;
+    }
+
+    logger.info('Shop data saved successfully', { shop });
+
+  } catch (error) {
+    logger.error('Save shop data error', { error });
+    throw error;
   }
 }
 
