@@ -1388,6 +1388,19 @@ async function start() {
     logger.info(`Server running on http://${host}:${port}`);
     logger.info('Health check available at /health');
     logger.info('Metrics available at /metrics');
+    
+    // Graceful shutdown
+    process.on('SIGTERM', async () => {
+      logger.info('SIGTERM received, shutting down gracefully');
+      await fastify.close();
+      process.exit(0);
+    });
+    
+    process.on('SIGINT', async () => {
+      logger.info('SIGINT received, shutting down gracefully');
+      await fastify.close();
+      process.exit(0);
+    });
   } catch (error) {
     logger.error('Failed to start server', { error });
     process.exit(1);
