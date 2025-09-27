@@ -1093,6 +1093,11 @@ async function registerRoutes() {
                 app.dispatch(AppBridge.actions.Redirect.toApp, {
                   path: '/dashboard'
                 });
+                
+                // Alternatif: Admin apps sayfasına yönlendir
+                setTimeout(() => {
+                  window.location.href = 'https://${shop}/admin/apps';
+                }, 1000);
               } else {
                 // Fallback: Admin apps sayfasına yönlendir
                 setTimeout(() => {

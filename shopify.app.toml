@@ -17,3 +17,7 @@ redirect_urls = [
 url = "https://traffic-takip-production.up.railway.app/app-proxy"
 subpath = "app-proxy"
 prefix = "apps"
+
+[build]
+automatically_update_urls_on_dev = true
+dev_store_url = "hural-software.myshopify.com"
