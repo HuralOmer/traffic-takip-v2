@@ -59,8 +59,8 @@ async function getAppConfig(shop: string) {
       emaTauSlow: 60, // 60 saniye
     },
     endpoints: {
-      collect: '/app-proxy/collect',
-      config: '/app-proxy/config.json',
+      collect: '/apps/app-proxy/collect',
+      config: '/apps/app-proxy/config.json',
     },
     shop,
     timestamp: Date.now(),
