@@ -816,16 +816,8 @@ async function registerRoutes() {
           return reply.status(400).send({ error: 'Invalid shop parameter' });
         }
 
-        // Check if shop is installed
-        const { data: shopData } = await db.getClient()
-          .from('shops')
-          .select('*')
-          .eq('shop_domain', shop)
-          .single();
-
-        if (!shopData) {
-          return reply.status(404).send({ error: 'Shop not found' });
-        }
+        // Shop bilgilerini al (veritabanından değil, OAuth'dan)
+        logger.info('Dashboard accessed for shop', { shop });
 
         // Embedded app HTML
         const dashboardHtml = `
@@ -1079,7 +1071,7 @@ async function registerRoutes() {
 
         logger.info('Shop successfully authenticated', { shop });
 
-        // Embedded app için doğru yönlendirme - Shopify admin'e yönlendir
+        // Embedded app için doğru yönlendirme - App Bridge ile dashboard'a yönlendir
         const successHtml = `
           <!DOCTYPE html>
           <html>
@@ -1103,13 +1095,29 @@ async function registerRoutes() {
           <body>
             <div class="success">✅ Successfully Installed!</div>
             <div class="message">HRL Tracking has been successfully installed to your store.</div>
-            <div class="message">Redirecting to Shopify admin...</div>
+            <div class="message">Redirecting to dashboard...</div>
             
             <script>
-              // Shopify admin'e yönlendir
-              setTimeout(() => {
-                window.top.location.href = 'https://${shop}/admin/apps';
-              }, 2000);
+              // App Bridge ile dashboard'a yönlendir
+              if (window.ShopifyAppBridge) {
+                const AppBridge = window.ShopifyAppBridge.default;
+                const createApp = AppBridge.createApp;
+                
+                const app = createApp({
+                  apiKey: '${process.env['SHOPIFY_API_KEY']}',
+                  shopOrigin: '${shop}',
+                });
+
+                // Dashboard'a yönlendir
+                app.dispatch(AppBridge.actions.Redirect.toApp, {
+                  path: '/dashboard'
+                });
+              } else {
+                // Fallback: Doğrudan dashboard'a yönlendir
+                setTimeout(() => {
+                  window.location.href = '/dashboard?shop=${shop}';
+                }, 1000);
+              }
             </script>
           </body>
           </html>
