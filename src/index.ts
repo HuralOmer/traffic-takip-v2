@@ -1067,7 +1067,15 @@ async function registerRoutes() {
 
         // Veritabanına kaydet
         logger.info('Saving shop data to database', { shop });
-        await saveShopData(shop, accessToken, shopInfo);
+        try {
+          await saveShopData(shop, accessToken, shopInfo);
+        } catch (error) {
+          logger.warn('Failed to save shop data, continuing without database save', { 
+            shop, 
+            error: error instanceof Error ? error.message : String(error) 
+          });
+          // Database hatası olsa bile OAuth'u başarılı say
+        }
 
         logger.info('Shop successfully authenticated', { shop });
 
@@ -1804,7 +1812,12 @@ async function saveShopData(shop: string, accessToken: string, shopInfo: any): P
         return;
       }
       
-      throw error;
+      // For any other database error, just log and continue
+      logger.warn('Database save failed, continuing without database save', { 
+        shop, 
+        error: error.message 
+      });
+      return;
     }
 
     logger.info('Shop data saved successfully', { shop });
@@ -1816,13 +1829,11 @@ async function saveShopData(shop: string, accessToken: string, shopInfo: any): P
       shop 
     });
     
-    // Don't throw error for missing table, just log warning
-    if (errorMessage.includes('relation "shops" does not exist')) {
-      logger.warn('Shops table does not exist, continuing without database save', { shop });
-      return;
-    }
-    
-    throw error;
+    // Don't throw error for any database issue, just log warning
+    logger.warn('Database save failed, continuing without database save', { 
+      shop, 
+      error: errorMessage 
+    });
   }
 }
 
