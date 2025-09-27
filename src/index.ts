@@ -1071,7 +1071,7 @@ async function registerRoutes() {
 
         logger.info('Shop successfully authenticated', { shop });
 
-        // Shopify admin'e yönlendir
+        // Embedded app için doğru yönlendirme
         const successHtml = `
           <!DOCTYPE html>
           <html>
@@ -1079,6 +1079,7 @@ async function registerRoutes() {
             <title>HRL Tracking - Successfully Installed</title>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
+            <script src="https://unpkg.com/@shopify/app-bridge@3"></script>
             <style>
               body { 
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -1094,13 +1095,33 @@ async function registerRoutes() {
           <body>
             <div class="success">✅ Successfully Installed!</div>
             <div class="message">HRL Tracking has been successfully installed to your store.</div>
-            <div class="message">Redirecting to Shopify admin...</div>
+            <div class="message">Redirecting to app...</div>
             
             <script>
-              // Shopify admin'e yönlendir
-              setTimeout(() => {
+              // App Bridge ile embedded app'e yönlendir
+              if (window.ShopifyAppBridge) {
+                try {
+                  const AppBridge = window.ShopifyAppBridge.default;
+                  const createApp = AppBridge.createApp;
+                  
+                  const app = createApp({
+                    apiKey: '${process.env['SHOPIFY_API_KEY']}',
+                    shopOrigin: '${shop}',
+                  });
+
+                  // Embedded app'e yönlendir
+                  app.dispatch(AppBridge.actions.Redirect.toApp, {
+                    path: '/dashboard'
+                  });
+                } catch (error) {
+                  console.error('App Bridge error:', error);
+                  // Fallback: Shopify admin'e yönlendir
+                  window.top.location.href = 'https://${shop}/admin/apps';
+                }
+              } else {
+                // Fallback: Shopify admin'e yönlendir
                 window.top.location.href = 'https://${shop}/admin/apps';
-              }, 2000);
+              }
             </script>
           </body>
           </html>
@@ -1398,9 +1419,10 @@ async function registerRoutes() {
             .single();
 
           if (existingShop) {
-            // Shop zaten yüklü, Shopify admin'e yönlendir
-            logger.info('Shop already installed, redirecting to Shopify admin', { shop });
-            return reply.redirect(`https://${shop}/admin/apps`);
+            // Shop zaten yüklü, embedded app'e yönlendir
+            logger.info('Shop already installed, redirecting to embedded app', { shop });
+            const dashboardUrl = `/dashboard?shop=${shop}`;
+            return reply.redirect(dashboardUrl);
           }
         } catch (error) {
           // Database hatası olsa bile OAuth'u başlat
