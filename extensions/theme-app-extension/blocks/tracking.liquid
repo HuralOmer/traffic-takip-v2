@@ -1,11 +1,6 @@
 {%- if settings.enable_tracking -%}
   <!-- HRL Traffic Tracking Script -->
-  <script defer src="{{ settings.app_proxy_subpath | default: 'app-proxy' | prepend: '/apps/' | append: '/tracking.js' | asset_url }}?v={{ settings.script_version | default: 1 }}"></script>
-  <script>
-    console.log('🎯 HRL Tracking: Kodlar başarıyla enjekte edildi!');
-    console.log('📊 Tracking aktif:', true);
-    console.log('🏪 Mağaza:', '{{ shop.domain }}');
-  </script>
+  <script defer src="/apps/{{ settings.app_proxy_subpath | default: 'app-proxy' }}/tracking.js?v={{ settings.script_version | default: 1 }}"></script>
 {%- endif -%}
 
 {% schema %}
@@ -13,8 +8,8 @@
   "name": "HRL Tracking",
   "target": "head",
   "settings": [
-    { "type": "text", "id": "app_proxy_subpath", "label": "App Proxy Subpath", "default": "app-proxy" },
     { "type": "checkbox", "id": "enable_tracking", "label": "Enable", "default": true },
+    { "type": "text", "id": "app_proxy_subpath", "label": "App Proxy Subpath", "default": "app-proxy" },
     { "type": "text", "id": "script_version", "label": "Script Version", "default": "1" }
   ]
 }

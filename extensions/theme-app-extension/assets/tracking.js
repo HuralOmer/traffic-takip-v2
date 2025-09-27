@@ -2,33 +2,30 @@
  * HRL Traffic Tracking - Ana Tracking Scripti
  * 
  * Bu dosya mağaza sayfalarına enjekte edilen ana tracking scriptidir.
- * Theme App Extension tarafından otomatik olarak yüklenir.
  */
 
 (function() {
   'use strict';
   
+  console.log('🚀 HRL Tracking: Script yüklendi');
+  
   // Global HRL Tracking namespace
   window.HRLTracking = {
     version: '1.0.0',
     isLoaded: function() { return true; },
-    config: {},
     sessionId: null,
     userId: null,
     
     // Başlatma fonksiyonu
     init: function() {
-      console.log('🚀 HRL Tracking: Ana script yüklendi');
+      console.log('🎯 HRL Tracking: Başlatılıyor...');
       
       // Session ID oluştur
       this.sessionId = this.generateSessionId();
       this.userId = this.generateUserId();
       
-      // Konfigürasyonu al
+      // Konfigürasyonu yükle
       this.loadConfig();
-      
-      // Event listener'ları ekle
-      this.setupEventListeners();
       
       // Sayfa görüntüleme eventi gönder
       this.trackPageView();
@@ -37,6 +34,31 @@
       this.startHeartbeat();
       
       console.log('✅ HRL Tracking: Başarıyla başlatıldı');
+      console.log('📊 Session ID:', this.sessionId);
+      console.log('👤 User ID:', this.userId);
+    },
+    
+    // Konfigürasyon yükle
+    loadConfig: function() {
+      const script = document.querySelector('script[src^="/apps/"][src*="tracking.js"]');
+      if (script) {
+        const url = new URL(script.src);
+        const baseUrl = url.origin + url.pathname.replace('/tracking.js', '');
+        
+        this.config = {
+          baseUrl: baseUrl,
+          endpoints: {
+            collect: baseUrl + '/collect',
+            config: baseUrl + '/config.json'
+          },
+          shop: window.Shopify?.shop || 'unknown',
+          timestamp: Date.now()
+        };
+        
+        console.log('📋 HRL Tracking: Konfigürasyon yüklendi', this.config);
+      } else {
+        console.warn('⚠️ HRL Tracking: App Proxy script bulunamadı');
+      }
     },
     
     // Session ID oluştur
@@ -59,101 +81,34 @@
       return userId;
     },
     
-    // Konfigürasyon yükle
-    loadConfig: function() {
-      const script = document.querySelector('script[src*="tracking.js"]');
-      if (script) {
-        const url = new URL(script.src);
-        const baseUrl = url.origin + url.pathname.replace('/tracking.js', '');
-        
-        this.config = {
-          baseUrl: baseUrl,
-          endpoints: {
-            collect: baseUrl + '/collect',
-            config: baseUrl + '/config.json'
-          },
-          shop: window.Shopify?.shop || 'unknown',
-          timestamp: Date.now()
-        };
-        
-        console.log('📋 HRL Tracking: Konfigürasyon yüklendi', this.config);
-      }
-    },
-    
-    // Event listener'ları kur
-    setupEventListeners: function() {
-      // Sayfa görüntüleme
-      window.addEventListener('pagehide', () => {
-        this.trackEvent('page_hide');
-      });
-      
-      // Sayfa değişikliği (SPA için)
-      window.addEventListener('popstate', () => {
-        this.trackPageView();
-      });
-      
-      // Visibility değişikliği
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-          this.trackEvent('page_hide');
-        } else {
-          this.trackEvent('page_show');
-        }
-      });
-    },
-    
     // Sayfa görüntüleme takibi
     trackPageView: function() {
       const pageData = {
+        type: 'page_view',
         url: window.location.href,
         title: document.title,
-        referrer: document.referrer,
         timestamp: Date.now(),
         sessionId: this.sessionId,
         userId: this.userId,
-        shop: this.config.shop
+        shop: window.Shopify?.shop || 'unknown'
       };
       
-      this.trackEvent('page_view', pageData);
-    },
-    
-    // Event gönder
-    trackEvent: function(eventType, data = {}) {
-      if (!this.config.baseUrl) {
-        console.warn('⚠️ HRL Tracking: Konfigürasyon yüklenmedi');
-        return;
-      }
+      console.log('📊 HRL Tracking Event:', pageData);
       
-      const eventData = {
-        type: eventType,
-        timestamp: Date.now(),
-        sessionId: this.sessionId,
-        userId: this.userId,
-        shop: this.config.shop,
-        page: {
-          url: window.location.href,
-          title: document.title,
-          referrer: document.referrer
-        },
-        userAgent: navigator.userAgent,
-        language: navigator.language,
-        ...data
-      };
-      
-      // Console'da göster (development için)
-      console.log('📊 HRL Tracking Event:', eventType, eventData);
-      
-      // Sunucuya gönder
-      this.sendToServer(eventData);
+      // Sunucuya gönder (şimdilik sadece console'da göster)
+      this.sendToServer(pageData);
     },
     
     // Sunucuya veri gönder
     sendToServer: function(data) {
-      if (!this.config.endpoints?.collect) {
+      if (!this.config?.endpoints?.collect) {
+        console.warn('⚠️ HRL Tracking: Collect endpoint bulunamadı');
         return;
       }
       
-      // Fetch ile gönder
+      console.log('📤 HRL Tracking: Veri gönderiliyor...', data);
+      
+      // Gerçek API endpoint'e gönder
       fetch(this.config.endpoints.collect, {
         method: 'POST',
         headers: {
@@ -179,21 +134,23 @@
     startHeartbeat: function() {
       // Her 30 saniyede bir heartbeat gönder
       setInterval(() => {
-        this.trackEvent('heartbeat', {
-          duration: Date.now() - (this.config.timestamp || Date.now())
-        });
+        this.trackEvent('heartbeat');
       }, 30000);
     },
     
-    // Debug bilgileri
-    getDebugInfo: function() {
-      return {
-        version: this.version,
+    // Event gönder
+    trackEvent: function(eventType, data = {}) {
+      const eventData = {
+        type: eventType,
+        timestamp: Date.now(),
         sessionId: this.sessionId,
         userId: this.userId,
-        config: this.config,
-        isLoaded: this.isLoaded()
+        shop: window.Shopify?.shop || 'unknown',
+        ...data
       };
+      
+      console.log('📊 HRL Tracking Event:', eventData);
+      this.sendToServer(eventData);
     }
   };
   
@@ -208,158 +165,14 @@
   
   // Global debug fonksiyonu
   window.getHRLTrackingDebug = function() {
-    return window.HRLTracking.getDebugInfo();
+    return {
+      version: window.HRLTracking.version,
+      sessionId: window.HRLTracking.sessionId,
+      userId: window.HRLTracking.userId,
+      isLoaded: window.HRLTracking.isLoaded()
+    };
   };
   
-  // Yardımcı araçlar
-  window.HRLTrackingUtils = {
-    
-    // Debug panel oluştur
-    createDebugPanel: function() {
-      if (document.getElementById('hrl-debug-panel')) {
-        return; // Zaten mevcut
-      }
-      
-      const debugPanel = document.createElement('div');
-      debugPanel.id = 'hrl-debug-panel';
-      debugPanel.className = 'hrl-debug-panel';
-      debugPanel.innerHTML = `
-        <div class="debug-header">HRL Tracking Debug</div>
-        <div class="debug-item">
-          <span class="debug-label">Status:</span>
-          <span class="debug-value" id="debug-status">Loading...</span>
-        </div>
-        <div class="debug-item">
-          <span class="debug-label">Active Users:</span>
-          <span class="debug-value" id="debug-users">-</span>
-        </div>
-        <div class="debug-item">
-          <span class="debug-label">Sessions:</span>
-          <span class="debug-value" id="debug-sessions">-</span>
-        </div>
-        <div class="debug-item">
-          <span class="debug-label">Last Update:</span>
-          <span class="debug-value" id="debug-update">-</span>
-        </div>
-      `;
-      
-      document.body.appendChild(debugPanel);
-      
-      // CSS dosyasını yükle
-      this.loadCSS();
-      
-      // Debug panel'i göster
-      setTimeout(() => {
-        debugPanel.classList.add('show');
-      }, 100);
-    },
-    
-    // CSS dosyasını yükle
-    loadCSS: function() {
-      if (document.getElementById('hrl-tracking-css')) {
-        return; // Zaten yüklü
-      }
-      
-      const link = document.createElement('link');
-      link.id = 'hrl-tracking-css';
-      link.rel = 'stylesheet';
-      link.href = '{{ "tracking.css" | asset_url }}';
-      document.head.appendChild(link);
-    },
-    
-    // Debug bilgilerini güncelle
-    updateDebugInfo: function(data) {
-      const statusEl = document.getElementById('debug-status');
-      const usersEl = document.getElementById('debug-users');
-      const sessionsEl = document.getElementById('debug-sessions');
-      const updateEl = document.getElementById('debug-update');
-      
-      if (statusEl) statusEl.textContent = data.status || 'Unknown';
-      if (usersEl) usersEl.textContent = data.activeUsers || 0;
-      if (sessionsEl) sessionsEl.textContent = data.activeSessions || 0;
-      if (updateEl) updateEl.textContent = new Date().toLocaleTimeString();
-    },
-    
-    // Status widget oluştur
-    createStatusWidget: function(status) {
-      if (document.getElementById('hrl-status-widget')) {
-        return; // Zaten mevcut
-      }
-      
-      const widget = document.createElement('div');
-      widget.id = 'hrl-status-widget';
-      widget.className = 'hrl-tracking-widget';
-      
-      const statusClass = status === 'active' ? '' : status === 'error' ? 'error' : 'warning';
-      const statusText = status === 'active' ? 'Tracking Active' : 
-                        status === 'error' ? 'Tracking Error' : 'Tracking Inactive';
-      
-      widget.innerHTML = `
-        <span class="status-dot ${statusClass}"></span>
-        <span>HRL: ${statusText}</span>
-      `;
-      
-      document.body.appendChild(widget);
-      
-      // CSS dosyasını yükle
-      this.loadCSS();
-      
-      // Widget'ı göster
-      setTimeout(() => {
-        widget.classList.add('show');
-      }, 500);
-      
-      // 5 saniye sonra gizle
-      setTimeout(() => {
-        widget.classList.remove('show');
-        setTimeout(() => {
-          if (widget.parentNode) {
-            widget.parentNode.removeChild(widget);
-          }
-        }, 300);
-      }, 5000);
-    },
-    
-    // Keyboard shortcut'ları
-    initKeyboardShortcuts: function() {
-      document.addEventListener('keydown', function(e) {
-        // Ctrl + Shift + H = Debug panel toggle
-        if (e.ctrlKey && e.shiftKey && e.key === 'H') {
-          e.preventDefault();
-          const debugPanel = document.getElementById('hrl-debug-panel');
-          if (debugPanel) {
-            debugPanel.classList.toggle('show');
-          } else {
-            window.HRLTrackingUtils.createDebugPanel();
-          }
-        }
-        
-        // Ctrl + Shift + T = Status widget
-        if (e.ctrlKey && e.shiftKey && e.key === 'T') {
-          e.preventDefault();
-          const status = window.HRLTracking && window.HRLTracking.isLoaded() ? 'active' : 'error';
-          window.HRLTrackingUtils.createStatusWidget(status);
-        }
-      });
-    }
-  };
-  
-  // Sayfa yüklendiğinde keyboard shortcut'ları aktif et
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      window.HRLTrackingUtils.initKeyboardShortcuts();
-    });
-  } else {
-    window.HRLTrackingUtils.initKeyboardShortcuts();
-  }
-  
-  // Development modunda debug panel'i otomatik aç
-  if (window.location.hostname === 'localhost' || window.location.hostname.includes('myshopify.com')) {
-    setTimeout(() => {
-      if (window.HRLTracking && !window.HRLTracking.isLoaded()) {
-        window.HRLTrackingUtils.createDebugPanel();
-      }
-    }, 2000);
-  }
+  console.log('🎉 HRL Tracking: Script hazır!');
   
 })();
