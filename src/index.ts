@@ -1062,7 +1062,7 @@ async function registerRoutes() {
 
         logger.info('Shop successfully authenticated', { shop });
 
-        // Embedded app için doğru yönlendirme
+        // Embedded app için doğru yönlendirme - Shopify admin'e yönlendir
         const successHtml = `
           <!DOCTYPE html>
           <html>
@@ -1086,29 +1086,13 @@ async function registerRoutes() {
           <body>
             <div class="success">✅ Successfully Installed!</div>
             <div class="message">HRL Tracking has been successfully installed to your store.</div>
-            <div class="message">Redirecting to dashboard...</div>
+            <div class="message">Redirecting to Shopify admin...</div>
             
             <script>
-              // App Bridge ile embedded app'e yönlendir
-              if (window.ShopifyAppBridge) {
-                const AppBridge = window.ShopifyAppBridge.default;
-                const createApp = AppBridge.createApp;
-                
-                const app = createApp({
-                  apiKey: '${process.env['SHOPIFY_API_KEY']}',
-                  shopOrigin: '${shop}',
-                });
-
-                // Embedded app dashboard'a yönlendir
-                app.dispatch(AppBridge.actions.Redirect.toApp, {
-                  path: '/dashboard'
-                });
-              } else {
-                // Fallback: Doğrudan dashboard'a yönlendir
-                setTimeout(() => {
-                  window.location.href = '${process.env['SHOPIFY_APP_URL']}/dashboard?shop=${shop}';
-                }, 1000);
-              }
+              // Shopify admin'e yönlendir
+              setTimeout(() => {
+                window.top.location.href = 'https://${shop}/admin/apps';
+              }, 2000);
             </script>
           </body>
           </html>
@@ -1397,35 +1381,22 @@ async function registerRoutes() {
 
       // Eğer shop parametresi varsa, OAuth akışını başlat
       if (shop && shop.endsWith('.myshopify.com')) {
-        // Shop'un zaten yüklü olup olmadığını kontrol et
-        const { data: existingShop } = await db.getClient()
-          .from('shops')
-          .select('*')
-          .eq('shop_domain', shop)
-          .single();
-
-        if (existingShop) {
-          // Shop zaten yüklü, embedded app dashboard'a yönlendir
-          const dashboardUrl = `/dashboard?shop=${shop}&hmac=${hmac}&host=${host}&timestamp=${timestamp}`;
-          return reply.redirect(dashboardUrl);
-        } else {
-          // Shop yüklü değil, OAuth akışını başlat
-          const clientId = process.env['SHOPIFY_API_KEY'];
-          const redirectUri = `${process.env['SHOPIFY_APP_URL']}/auth/callback`;
-          const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics';
-          
-          logger.info('Main route OAuth URL generation', {
-            shop,
-            clientId: clientId ? 'present' : 'missing',
-            redirectUri,
-            appUrl: process.env['SHOPIFY_APP_URL']
-          });
-          
-          const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=install`;
-          
-          logger.info('Main route generated OAuth URL', { authUrl });
-          return reply.redirect(authUrl);
-        }
+        // Embedded app için her zaman OAuth akışını başlat
+        const clientId = process.env['SHOPIFY_API_KEY'];
+        const redirectUri = `${process.env['SHOPIFY_APP_URL']}/auth/callback`;
+        const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics';
+        
+        logger.info('Main route OAuth URL generation', {
+          shop,
+          clientId: clientId ? 'present' : 'missing',
+          redirectUri,
+          appUrl: process.env['SHOPIFY_APP_URL']
+        });
+        
+        const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=install`;
+        
+        logger.info('Main route generated OAuth URL', { authUrl });
+        return reply.redirect(authUrl);
       }
 
       // Shop parametresi yoksa, basit bir bilgi sayfası göster
