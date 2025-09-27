@@ -1103,6 +1103,69 @@ async function registerRoutes() {
     });
   });
 
+  // Main app route - OAuth flow starter
+  fastify.get('/', async (request, reply) => {
+    try {
+      const { shop, hmac, host, timestamp } = request.query as { 
+        shop?: string; 
+        hmac?: string; 
+        host?: string; 
+        timestamp?: string; 
+      };
+
+      // Eğer shop parametresi varsa, OAuth akışını başlat
+      if (shop && shop.endsWith('.myshopify.com')) {
+        // Shop'un zaten yüklü olup olmadığını kontrol et
+        const { data: existingShop } = await db.getClient()
+          .from('shops')
+          .select('*')
+          .eq('shop_domain', shop)
+          .single();
+
+        if (existingShop) {
+          // Shop zaten yüklü, dashboard'a yönlendir
+          const dashboardUrl = `/dashboard?shop=${shop}&hmac=${hmac}&host=${host}&timestamp=${timestamp}`;
+          return reply.redirect(dashboardUrl);
+        } else {
+          // Shop yüklü değil, OAuth akışını başlat
+          const clientId = process.env['SHOPIFY_API_KEY'];
+          const redirectUri = `${process.env['SHOPIFY_APP_URL']}/auth/callback`;
+          const scopes = 'read_products,write_products,read_orders,write_orders,read_analytics,write_analytics';
+          
+          const authUrl = `https://${shop}/admin/oauth/authorize?client_id=${clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUri)}&state=install`;
+          
+          return reply.redirect(authUrl);
+        }
+      }
+
+      // Shop parametresi yoksa, basit bir bilgi sayfası göster
+      const infoHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>HRL Tracking App</title>
+          <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+            .info { color: #333; font-size: 18px; margin-bottom: 20px; }
+            .status { color: #28a745; font-size: 16px; }
+          </style>
+        </head>
+        <body>
+          <div class="info">🚀 HRL Tracking App</div>
+          <div class="status">Application is running and ready for installation</div>
+          <div class="status">Version: 1.0.0</div>
+        </body>
+        </html>
+      `;
+
+      return reply.type('text/html').send(infoHtml);
+
+    } catch (error) {
+      logger.error('Main route error', { error });
+      return reply.status(500).send({ error: 'Application error' });
+    }
+  });
+
   // Dashboard routes
   fastify.register(async function (fastify) {
     // Dashboard ana sayfa
