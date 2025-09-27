@@ -1,6 +1,7 @@
 {%- if settings.enable_tracking -%}
-  <!-- HRL Traffic Tracking Script -->
-  <script defer src="{{ 'tracking-main.js' | asset_url }}?v={{ settings.script_version | default: 1 }}"></script>
+  {%- comment -%} theme-check-disable AssetUrlFilters RemoteAsset {%- endcomment -%}
+  <script defer src="{{ routes.root_url }}apps/{{ settings.app_proxy_subpath | default: 'app-proxy' }}/tracking.js?v={{ settings.script_version | default: 1 }}"></script>
+  {%- comment -%} theme-check-enable AssetUrlFilters RemoteAsset {%- endcomment -%}
 {%- endif -%}
 
 {% schema %}

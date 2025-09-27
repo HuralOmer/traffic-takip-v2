@@ -376,6 +376,8 @@ function generateTrackingScript(config: any): string {
     init: function() {
       if (this.initialized) return;
       
+      console.log('🚀 HRL Tracking: Ana script yüklendi');
+      
       this.visitorId = this.getOrCreateVisitorId();
       this.sessionId = this.generateSessionId();
       
@@ -384,7 +386,7 @@ function generateTrackingScript(config: any): string {
       this.startSessions();
       
       this.initialized = true;
-      console.log('HRL Tracking initialized');
+      console.log('✅ HRL Tracking: Başarıyla başlatıldı');
     },
     
     // Get or create visitor ID
@@ -413,17 +415,15 @@ function generateTrackingScript(config: any): string {
         fetch(CONFIG.endpoints.collect, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'X-Shop': CONFIG.shop
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            event_type: 'heartbeat',
-            data: {
-              visitor_id: self.visitorId,
-              session_id: self.sessionId,
-              page_path: window.location.pathname,
-              timestamp: Date.now()
-            }
+            type: 'heartbeat',
+            shop: CONFIG.shop,
+            visitor_id: self.visitorId,
+            session_id: self.sessionId,
+            page_path: window.location.pathname,
+            timestamp: Date.now()
           })
         }).catch(err => console.warn('Heartbeat failed:', err));
       }
@@ -442,13 +442,12 @@ function generateTrackingScript(config: any): string {
         
         // Send final heartbeat
         navigator.sendBeacon(CONFIG.endpoints.collect, JSON.stringify({
-          event_type: 'page_unload',
-          data: {
-            visitor_id: self.visitorId,
-            session_id: self.sessionId,
-            page_path: window.location.pathname,
-            timestamp: Date.now()
-          }
+          type: 'page_unload',
+          shop: CONFIG.shop,
+          visitor_id: self.visitorId,
+          session_id: self.sessionId,
+          page_path: window.location.pathname,
+          timestamp: Date.now()
         }));
       });
     },
@@ -464,19 +463,17 @@ function generateTrackingScript(config: any): string {
       fetch(CONFIG.endpoints.collect, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-Shop': CONFIG.shop
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          event_type: 'page_view',
-          data: {
-            visitor_id: self.visitorId,
-            session_id: self.sessionId,
-            page_path: window.location.pathname,
-            page_title: document.title,
-            referrer: document.referrer,
-            timestamp: startTime
-          }
+          type: 'page_view',
+          shop: CONFIG.shop,
+          visitor_id: self.visitorId,
+          session_id: self.sessionId,
+          page_path: window.location.pathname,
+          page_title: document.title,
+          referrer: document.referrer,
+          timestamp: startTime
         })
       }).catch(err => console.warn('Page view tracking failed:', err));
       
@@ -485,14 +482,13 @@ function generateTrackingScript(config: any): string {
         const duration = Date.now() - startTime;
         
         navigator.sendBeacon(CONFIG.endpoints.collect, JSON.stringify({
-          event_type: 'page_close',
-          data: {
-            visitor_id: self.visitorId,
-            session_id: self.sessionId,
-            page_path: window.location.pathname,
-            duration_ms: duration,
-            timestamp: Date.now()
-          }
+          type: 'page_close',
+          shop: CONFIG.shop,
+          visitor_id: self.visitorId,
+          session_id: self.sessionId,
+          page_path: window.location.pathname,
+          duration_ms: duration,
+          timestamp: Date.now()
         }));
       });
     },
@@ -507,17 +503,15 @@ function generateTrackingScript(config: any): string {
       fetch(CONFIG.endpoints.collect, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-Shop': CONFIG.shop
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          event_type: 'session_start',
-          data: {
-            visitor_id: self.visitorId,
-            session_id: self.sessionId,
-            page_path: window.location.pathname,
-            timestamp: Date.now()
-          }
+          type: 'session_start',
+          shop: CONFIG.shop,
+          visitor_id: self.visitorId,
+          session_id: self.sessionId,
+          page_path: window.location.pathname,
+          timestamp: Date.now()
         })
       }).catch(err => console.warn('Session tracking failed:', err));
     }
