@@ -1426,7 +1426,10 @@ async function start() {
         .header('Cache-Control', 'public, max-age=300')
         .header('Access-Control-Allow-Origin', '*')
         .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        .header('Access-Control-Allow-Headers', 'Content-Type')
+        .header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With')
+        .header('Access-Control-Allow-Credentials', 'false')
+        .header('X-Content-Type-Options', 'nosniff')
+        .header('X-Frame-Options', 'ALLOWALL')
         .send(trackingScript);
     });
 
@@ -1435,7 +1438,10 @@ async function start() {
       reply
         .header('Access-Control-Allow-Origin', '*')
         .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        .header('Access-Control-Allow-Headers', 'Content-Type')
+        .header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With')
+        .header('Access-Control-Allow-Credentials', 'false')
+        .header('X-Content-Type-Options', 'nosniff')
+        .header('X-Frame-Options', 'ALLOWALL')
         .send();
     });
 

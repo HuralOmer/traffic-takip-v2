@@ -1,8 +1,148 @@
 {% comment %} theme-check-disable AssetUrlFilters RemoteAsset {% endcomment %}
-<script
-  id="hrl-app-proxy"
-  defer
-  src="https://traffic-takip-production.up.railway.app/app-proxy/tracking.js?shop={{ shop.permanent_domain }}&v={{ settings.script_version | default: 1 }}">
+<script id="hrl-app-proxy" defer>
+  // HRL Traffic Tracking - Inline Script
+  (function () {
+    'use strict';
+
+    // ---- helpers -------------------------------------------------------------
+    function uid(prefix) {
+      return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function getOrSetLS(key, gen) {
+      let v = localStorage.getItem(key);
+      if (!v) {
+        v = gen();
+        localStorage.setItem(key, v);
+      }
+      return v;
+    }
+
+    // ---- bootstrap element & endpoints --------------------------------------
+    var scriptEl = document.getElementById('hrl-app-proxy');
+    if (!scriptEl) {
+      console.warn('HRL Tracking: bootstrap script element not found');
+      return;
+    }
+
+    // Shop bilgisini URL'den al
+    var shop = '{{ shop.permanent_domain }}';
+    var basePath = '/app-proxy';
+    var ORIGIN = 'https://traffic-takip-production.up.railway.app';
+
+    // ---- config & state -----------------------------------------------------
+    var HRL = {
+      config: {
+        shop: shop,
+        endpoints: {
+          config: ORIGIN + basePath + '/config.json?shop=' + encodeURIComponent(shop),
+          collect: ORIGIN + basePath + '/collect'
+        }
+      },
+      visitorId: getOrSetLS('hrl_visitor_id', function() { return uid('visitor'); }),
+      sessionId: getOrSetLS('hrl_session_id', function() { return uid('session'); }),
+      initialized: false
+    };
+
+    // ---- tracking functions -------------------------------------------------
+    function payload(type, extra) {
+      return Object.assign({
+        type: type,
+        shop: HRL.config.shop,
+        visitor_id: HRL.visitorId,
+        session_id: HRL.sessionId,
+        page_path: location.pathname,
+        page_title: document.title,
+        referrer: document.referrer,
+        timestamp: Date.now(),
+        user_agent: navigator.userAgent,
+        lang: navigator.language
+      }, extra || {});
+    }
+
+    function send(data) {
+      console.log('HRL Tracking: Sending data', data);
+      fetch(HRL.config.endpoints.collect, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+        credentials: 'omit'
+      }).then(function(response) {
+        console.log('HRL Tracking: Response received', response.status, response.statusText);
+        return response.json();
+      }).then(function(data) {
+        console.log('HRL Tracking: Data processed', data);
+      }).catch(function(error) {
+        console.warn('HRL Tracking: Send error', error);
+      });
+    }
+
+    function track(type, extra) {
+      send(payload(type, extra));
+    }
+
+    // ---- heartbeat ----------------------------------------------------------
+    var hbTimer = null;
+    var startTs = Date.now();
+    function startHeartbeat() {
+      // ilk nabız
+      track('heartbeat', { since_ms: 0 });
+      // periyodik
+      hbTimer = setInterval(function () {
+        track('heartbeat', { since_ms: Date.now() - startTs });
+      }, 10000); // 10 saniye
+    }
+
+    function stopHeartbeat() {
+      if (hbTimer) {
+        clearInterval(hbTimer);
+        hbTimer = null;
+      }
+    }
+
+    // ---- page tracking ------------------------------------------------------
+    function trackPageView() {
+      track('page_view');
+    }
+
+    function trackPageUnload() {
+      track('page_unload', { since_ms: Date.now() - startTs });
+    }
+
+    // ---- initialization -----------------------------------------------------
+    function init() {
+      if (HRL.initialized) return;
+      
+      console.log('HRL Tracking: Initializing...');
+      
+      // Page view
+      trackPageView();
+      
+      // Heartbeat
+      startHeartbeat();
+      
+      // Page unload
+      window.addEventListener('beforeunload', trackPageUnload);
+      
+      HRL.initialized = true;
+      console.log('HRL Tracking: Initialized successfully');
+    }
+
+    // ---- auto-start ---------------------------------------------------------
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+
+    // ---- global API ---------------------------------------------------------
+    window.HRL = {
+      track: track,
+      config: HRL.config,
+      initialized: function() { return HRL.initialized; }
+    };
+
+  })();
 </script>
 {% comment %} theme-check-enable AssetUrlFilters RemoteAsset {% endcomment %}
 
