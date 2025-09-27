@@ -12,30 +12,3 @@ name = "HRL Traffic Tracking"
 target = "head"
 
 [extensions.settings]
-[extensions.settings.app_proxy_subpath]
-type = "single_line_text_field"
-id = "app_proxy_subpath"
-label = "App Proxy Subpath"
-default = "app-proxy"
-help_text = "App Proxy alt yolu (örn: hrl-proxy)"
-
-[extensions.settings.enable_tracking]
-type = "boolean"
-id = "enable_tracking"
-label = "Trafik Takibini Etkinleştir"
-default = true
-help_text = "Bu seçenek kapatılırsa tracking script'i yüklenmez."
-
-[extensions.settings.enable_debug]
-type = "boolean"
-id = "enable_debug"
-label = "Debug Modu"
-default = false
-help_text = "Debug modu aktif olduğunda console'da detaylı loglar görünür."
-
-[extensions.settings.script_version]
-type = "number_integer"
-id = "script_version"
-label = "Script Versiyonu"
-default = 1
-help_text = "Script versiyonu (cache busting için). Değiştirmeyin."
