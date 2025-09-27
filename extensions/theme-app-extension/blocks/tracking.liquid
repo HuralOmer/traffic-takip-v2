@@ -1,93 +1,15 @@
-{% comment %}
-  HRL Traffic Tracking - Otomatik Enjeksiyon
-  Bu script otomatik olarak tüm sayfalara enjekte edilir.
-{% endcomment %}
-
-<script>
-(function() {
-  'use strict';
-  
-  // Configuration
-  const config = {
-    shop: '{{ shop.permanent_domain }}',
-    version: '1',
-    proxyPath: '/apps/app-proxy/tracking.js',
-    loaded: false,
-    startTime: Date.now()
-  };
-  
-  // Performance monitoring
-  function logPerformance() {
-    const loadTime = Date.now() - config.startTime;
-    console.log(`HRL Tracking: Script yüklendi (${loadTime}ms)`);
-  }
-  
-  // Asıl tracking script'ini yükle
-  function loadTrackingScript() {
-    return new Promise((resolve, reject) => {
-      const versionParam = config.version ? `?v=${config.version}` : '';
-      const scriptUrl = `https://${config.shop}/${config.proxyPath}${versionParam}`;
-      
-      const script = document.createElement('script');
-      script.src = scriptUrl;
-      script.defer = true;
-      script.async = true;
-      
-      script.onload = function() {
-        config.loaded = true;
-        logPerformance();
-        resolve();
-      };
-      
-      script.onerror = function(error) {
-        console.error('HRL Tracking: Script yüklenirken hata oluştu:', error);
-        reject(error);
-      };
-      
-      document.head.appendChild(script);
-    });
-  }
-  
-  // Fallback mekanizması
-  function createFallback() {
-    console.warn('HRL Tracking: App Proxy script yüklenemedi. Fallback moduna geçiliyor...');
-    
-    window.HRLTracking = {
-      init: function() {
-        console.log('HRL Tracking: Fallback modu aktif');
-        config.loaded = true;
-        logPerformance();
-      },
-      track: function(event, data) {
-        console.log('HRL Tracking (Fallback):', event, data);
-      },
-      isLoaded: function() {
-        return config.loaded;
-      }
-    };
-    
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', window.HRLTracking.init);
-    } else {
-      window.HRLTracking.init();
-    }
-  }
-  
-  // Ana başlatma fonksiyonu
-  function init() {
-    loadTrackingScript().catch(createFallback);
-  }
-  
-  // Script'i hemen başlat (head içinde olduğu için)
-  init();
-})();
-</script>
+{%- if settings.enable_tracking -%}
+  <script defer src="{{ 'tracking.js' | asset_url }}?v={{ settings.script_version | default: 1 }}"></script>
+{%- endif -%}
 
 {% schema %}
 {
-  "name": "HRL Traffic Tracking",
-  "target": "head",
-  "category": "Analytics",
-  "settings": []
+  "name": "HRL Tracking",
+  "target": "body",
+  "settings": [
+    { "type": "text", "id": "app_proxy_subpath", "label": "App Proxy Subpath", "default": "app-proxy" },
+    { "type": "checkbox", "id": "enable_tracking", "label": "Enable", "default": true },
+    { "type": "text", "id": "script_version", "label": "Script Version", "default": "1" }
+  ]
 }
 {% endschema %}
