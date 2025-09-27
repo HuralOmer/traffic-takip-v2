@@ -975,7 +975,11 @@ async function registerRoutes() {
           </html>
         `;
 
-        return reply.type('text/html').send(dashboardHtml);
+        return reply
+          .type('text/html')
+          .header('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' https:; frame-ancestors https://*.myshopify.com https://admin.shopify.com;")
+          .header('X-Frame-Options', 'ALLOWALL')
+          .send(dashboardHtml);
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1067,7 +1071,11 @@ async function registerRoutes() {
           </html>
         `;
 
-        return reply.type('text/html').send(successHtml);
+        return reply
+          .type('text/html')
+          .header('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' https:; frame-ancestors https://*.myshopify.com https://admin.shopify.com;")
+          .header('X-Frame-Options', 'ALLOWALL')
+          .send(successHtml);
 
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1362,7 +1370,11 @@ async function registerRoutes() {
         </html>
       `;
 
-      return reply.type('text/html').send(infoHtml);
+      return reply
+        .type('text/html')
+        .header('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' https:; frame-ancestors https://*.myshopify.com https://admin.shopify.com;")
+        .header('X-Frame-Options', 'ALLOWALL')
+        .send(infoHtml);
 
     } catch (error) {
       logger.error('Main route error', { error });
