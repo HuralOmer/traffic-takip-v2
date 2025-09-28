@@ -98,24 +98,90 @@ export class SessionManager {
       const visitorCountsKey = `${REDIS_KEYS.VISITOR_SESSION_COUNTS}:${shop}`;
       const sessionMetaKey = `${REDIS_KEYS.SESSION_METADATA}:${shop}:${visitor_id}`;
 
-      // Lua script ile atomik session başlatma
-      console.log('SessionManager: Executing Lua script with keys:', [currentSessionKey, presenceSessionsKey, visitorCountsKey, sessionMetaKey]);
-      console.log('SessionManager: Executing Lua script with args:', [visitor_id, timestamp.toString(), SESSION_GAP_MS.toString(), SESSION_TTL_MS.toString(), page_path, referrer, user_agent, ip_hash]);
+      // Upstash Redis REST API'de Lua script'ler desteklenmiyor
+      // Normal Redis komutlarını kullanarak session başlatma
+      console.log('SessionManager: Starting session with Redis commands');
       
-      const result = await redis.getClient().eval(
-        LUA_SCRIPTS.SESSION_START,
-        [currentSessionKey, presenceSessionsKey, visitorCountsKey, sessionMetaKey],
-        [
-          visitor_id,
-          timestamp.toString(),
-          SESSION_GAP_MS.toString(),
-          SESSION_TTL_MS.toString(),
-          page_path,
-          referrer,
-          user_agent,
-          ip_hash
-        ]
-      ) as any;
+      // Mevcut session'ı kontrol et
+      const currentSessionId = await redis.getClient().get(currentSessionKey);
+      let isNewSession = false;
+      let sessionId = '';
+      let previousSessionId = null;
+      let sessionGap = 0;
+      
+      if (currentSessionId) {
+        // Mevcut session var, gap kontrolü yap
+        const sessionData = await redis.getClient().hgetall(`${REDIS_KEYS.SESSION_METADATA}:${shop}:${visitor_id}`);
+        if (sessionData && sessionData['last_activity']) {
+          const lastActivity = parseInt(sessionData['last_activity'] as string);
+          sessionGap = timestamp - lastActivity;
+          
+          if (sessionGap > SESSION_GAP_MS) {
+            // Yeni session başlat
+            previousSessionId = currentSessionId;
+            sessionId = `session_${visitor_id}_${timestamp}_${Math.floor(Math.random() * 900000) + 100000}`;
+            isNewSession = true;
+          } else {
+            // Mevcut session'ı güncelle
+            sessionId = currentSessionId as string;
+            isNewSession = false;
+          }
+        }
+      } else {
+        // Yeni session başlat
+        sessionId = `session_${visitor_id}_${timestamp}_${Math.floor(Math.random() * 900000) + 100000}`;
+        isNewSession = true;
+      }
+      
+      // Session'ı Redis'e kaydet
+      if (isNewSession) {
+        // Yeni session için metadata oluştur
+        await redis.getClient().hset(sessionMetaKey, {
+          session_id: sessionId,
+          visitor_id: visitor_id,
+          started_at: timestamp,
+          last_activity: timestamp,
+          page_count: 1,
+          first_page: page_path,
+          last_page: page_path,
+          referrer: referrer,
+          user_agent: user_agent,
+          ip_hash: ip_hash
+        });
+        
+        // Session'ı presence set'e ekle
+        await redis.getClient().zadd(presenceSessionsKey, { score: timestamp, member: sessionId });
+        
+        // Current session'ı güncelle
+        await redis.getClient().setex(currentSessionKey, Math.ceil(SESSION_TTL_MS / 1000), sessionId);
+        
+        // Visitor session count'unu artır
+        const currentCount = await redis.getClient().hget(visitorCountsKey, visitor_id);
+        const newCount = (currentCount ? parseInt(currentCount as string) : 0) + 1;
+        await redis.getClient().hset(visitorCountsKey, { [visitor_id]: newCount.toString() });
+        await redis.getClient().hset(visitorCountsKey, { [`${visitor_id}_last_session`]: timestamp.toString() });
+        
+        // TTL'leri ayarla
+        await redis.getClient().expire(sessionMetaKey, Math.ceil(SESSION_TTL_MS / 1000));
+        await redis.getClient().expire(presenceSessionsKey, Math.ceil(SESSION_TTL_MS / 1000));
+        await redis.getClient().expire(visitorCountsKey, Math.ceil(SESSION_TTL_MS / 1000));
+      } else {
+        // Mevcut session'ı güncelle
+        await redis.getClient().hset(sessionMetaKey, {
+          last_activity: timestamp,
+          last_page: page_path
+        });
+        
+        // Presence set'te güncelle
+        await redis.getClient().zadd(presenceSessionsKey, { score: timestamp, member: sessionId });
+      }
+
+      const result = {
+        session_id: sessionId,
+        is_new_session: isNewSession,
+        previous_session_id: previousSessionId,
+        session_gap_ms: sessionGap
+      };
 
       console.log('SessionManager: Session start result', result);
 
@@ -186,12 +252,46 @@ export class SessionManager {
       const presenceSessionsKey = `${REDIS_KEYS.PRESENCE_SESSIONS}:${shop}`;
       const sessionMetaKey = `${REDIS_KEYS.SESSION_METADATA}:${shop}:${visitor_id}`;
 
-      // Lua script ile atomik session sonlandırma
-      const result = await redis.getClient().eval(
-        LUA_SCRIPTS.SESSION_END,
-        [currentSessionKey, presenceSessionsKey, sessionMetaKey],
-        [session_id, timestamp.toString(), last_page]
-      ) as any;
+      // Upstash Redis REST API'de Lua script'ler desteklenmiyor
+      // Normal Redis komutlarını kullanarak session sonlandırma
+      console.log('SessionManager: Ending session with Redis commands');
+      
+      // Session metadata'sını al
+      const sessionData = await redis.getClient().hgetall(sessionMetaKey);
+      if (!sessionData || !sessionData['session_id']) {
+        return {
+          success: false,
+          message: ERROR_MESSAGES.SESSION_NOT_FOUND,
+          session_id
+        };
+      }
+      
+      // Session süresini hesapla
+      const startedAt = parseInt((sessionData['started_at'] as string) || '0');
+      const duration = timestamp - startedAt;
+      const pageCount = parseInt((sessionData['page_count'] as string) || '1');
+      
+      // Session'ı sonlandır
+      await redis.getClient().hset(sessionMetaKey, {
+        ended_at: timestamp,
+        last_page: last_page,
+        duration_ms: duration,
+        page_count: pageCount,
+        is_ended: true
+      });
+      
+      // Presence set'ten kaldır
+      await redis.getClient().zrem(presenceSessionsKey, session_id);
+      
+      // Current session'ı temizle
+      await redis.getClient().del(currentSessionKey);
+      
+      const result = {
+        success: true,
+        session_id: session_id,
+        duration_ms: duration,
+        page_count: pageCount
+      };
 
       console.log('SessionManager: Session end result', result);
 
@@ -251,12 +351,33 @@ export class SessionManager {
       const presenceSessionsKey = `${REDIS_KEYS.PRESENCE_SESSIONS}:${shop}`;
       const sessionMetaKey = `${REDIS_KEYS.SESSION_METADATA}:${shop}:${visitor_id}`;
 
-      // Lua script ile atomik session güncelleme
-      const result = await redis.getClient().eval(
-        LUA_SCRIPTS.SESSION_UPDATE,
-        [presenceSessionsKey, sessionMetaKey],
-        [session_id, timestamp.toString(), page_path]
-      ) as any;
+      // Upstash Redis REST API'de Lua script'ler desteklenmiyor
+      // Normal Redis komutlarını kullanarak session güncelleme
+      console.log('SessionManager: Updating session with Redis commands');
+      
+      // Session metadata'sını al
+      const sessionData = await redis.getClient().hgetall(sessionMetaKey);
+      if (!sessionData || !sessionData['session_id']) {
+        return false;
+      }
+      
+      // Page count'u artır
+      const pageCount = parseInt((sessionData['page_count'] as string) || '1') + 1;
+      
+      // Session'ı güncelle
+      await redis.getClient().hset(sessionMetaKey, {
+        last_activity: timestamp,
+        last_page: page_path,
+        page_count: pageCount
+      });
+      
+      // Presence set'te güncelle
+      await redis.getClient().zadd(presenceSessionsKey, { score: timestamp, member: session_id });
+      
+      const result = {
+        success: true,
+        page_count: pageCount
+      };
 
       // Lua script'ten dönen result'ı parse et
       const sessionResult = Array.isArray(result) ? result[0] : result;

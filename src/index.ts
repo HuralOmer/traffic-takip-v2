@@ -1409,29 +1409,27 @@ async function registerRoutes() {
 
         logger.info('Starting Redis cleanup for shop', { shop });
 
-        // Clear all Redis keys for this shop - use simple pattern matching
-        const patterns = [
+        // Clear all Redis keys for this shop - use direct key deletion
+        const keysToDelete = [
           `presence:v:${shop}`,
           `presence:s:${shop}`,
           `vis:session-count:${shop}`,
           `hist:sessions:${shop}`,
-          `visitor:current_session:${shop}`,
-          `session:meta:${shop}`,
-          `session_*${shop}*` // Catch any old session keys
+          `visitor:current_session:${shop}:*`,
+          `session:meta:${shop}:*`
         ];
 
         let clearedCount = 0;
-        for (const pattern of patterns) {
+        for (const key of keysToDelete) {
           try {
-            // Use SCAN to find keys matching pattern
-            const keys = await redis.getClient().keys(pattern);
-            if (keys && keys.length > 0) {
-              await redis.getClient().del(...keys);
-              clearedCount += keys.length;
-              logger.info('Cleared keys for pattern', { pattern, count: keys.length, keys });
+            // Try to delete the key directly
+            const result = await redis.getClient().del(key);
+            if (result > 0) {
+              clearedCount += result;
+              logger.info('Cleared key', { key, result });
             }
-          } catch (patternError) {
-            logger.warn('Error clearing pattern', { pattern, error: patternError });
+          } catch (keyError) {
+            logger.warn('Error clearing key', { key, error: keyError });
           }
         }
 
