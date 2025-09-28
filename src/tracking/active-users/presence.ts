@@ -45,6 +45,8 @@ export class PresenceTracker {
   public async updateVisitorPresence(presenceData: PresenceData): Promise<void> {
     const { shop, visitor_id, timestamp, page_path, user_agent, ip_hash } = presenceData;
     
+    console.log('PresenceTracker: updateVisitorPresence called', { shop, visitor_id, timestamp });
+    
     const key = `${REDIS_KEYS.PRESENCE_VISITORS}:${shop}`;
     const member = JSON.stringify({
       visitor_id,
@@ -54,8 +56,12 @@ export class PresenceTracker {
       ip_hash,
     } as RedisPresenceData);
 
+    console.log('PresenceTracker: Adding to Redis', { key, member, score: timestamp });
+
     // ZADD ile timestamp'i score olarak kullan
     await redis.getClient().zadd(key, { score: timestamp, member });
+    
+    console.log('PresenceTracker: Successfully added to Redis');
     
     // TTL ayarla
     await redis.getClient().expire(key, Math.ceil(TTL_MS / 1000));
