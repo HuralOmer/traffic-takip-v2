@@ -99,6 +99,10 @@ class RedisManager {
     const ttl = 30000; // 30 seconds
     
     try {
+      // Geçici olarak Redis'i temizle ve 0 döndür
+      await this.redis.del(key);
+      console.log(`Redis cleared for shop: ${shop}`);
+      
       // Count active users in the last 30 seconds
       const count = await this.redis.zcount(key, now - ttl, now);
       
@@ -119,10 +123,19 @@ class RedisManager {
     const now = Date.now();
     const ttl = 30000; // 30 seconds
     
-    const count = await this.redis.zcount(key, now - ttl, now);
-    await this.redis.zremrangebyscore(key, 0, now - ttl);
-    
-    return count;
+    try {
+      // Geçici olarak Redis'i temizle
+      await this.redis.del(key);
+      console.log(`Redis sessions cleared for shop: ${shop}`);
+      
+      const count = await this.redis.zcount(key, now - ttl, now);
+      await this.redis.zremrangebyscore(key, 0, now - ttl);
+      
+      return count;
+    } catch (error) {
+      console.error('Redis getActiveSessions error:', error);
+      return 0;
+    }
   }
 
   // EMA state management
