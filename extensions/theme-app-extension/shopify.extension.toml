@@ -16,4 +16,5 @@ handle = "hrl-traffic-tracking"
 target = "head"
 auto_inject = true
 
+# Extension ayarları
 [extensions.settings]

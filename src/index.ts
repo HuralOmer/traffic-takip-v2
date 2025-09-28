@@ -1901,7 +1901,11 @@ async function start() {
       process.exit(0);
     });
   } catch (error) {
-    logger.error('Failed to start server', { error });
+    logger.error('Failed to start server', { 
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    console.error('Detailed error:', error);
     process.exit(1);
   }
 }
