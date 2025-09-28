@@ -356,6 +356,53 @@ function generateDashboardHtml(shop: string): string {
 
 
 /**
+ * Shop'un veritabanında var olduğundan emin olur
+ * @param shop - Mağaza kimliği
+ */
+async function ensureShopExists(shop: string): Promise<void> {
+  try {
+    // Shop'un var olup olmadığını kontrol et
+    const { data: existingShop, error: checkError } = await db.getServiceClient()
+      .from('shops')
+      .select('id')
+      .eq('shop_domain', shop)
+      .single();
+
+    if (checkError && checkError.code !== 'PGRST116') {
+      // Shop yoksa oluştur
+      logger.info('Creating shop record for universal tracking', { shop });
+      
+      const { error: insertError } = await db.getServiceClient()
+        .from('shops')
+        .insert({
+          shop_domain: shop,
+          access_token: 'universal_tracking', // Universal tracking için özel token
+          shop_name: shop.replace('.myshopify.com', '').replace('.com', ''),
+          shop_email: '',
+          shop_currency: 'USD',
+          shop_timezone: 'UTC',
+          installed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+      if (insertError) {
+        logger.error('Failed to create shop record', { shop, error: insertError });
+      } else {
+        logger.info('Shop record created successfully', { shop });
+      }
+    } else if (existingShop) {
+      // Shop zaten var, updated_at'i güncelle
+      await db.getServiceClient()
+        .from('shops')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('shop_domain', shop);
+    }
+  } catch (error) {
+    logger.error('Error ensuring shop exists', { shop, error });
+  }
+}
+
+/**
  * Tracking event'ini işler
  * @param shop - Mağaza kimliği
  * @param eventType - Event türü
@@ -363,6 +410,9 @@ function generateDashboardHtml(shop: string): string {
  */
 async function processTrackingEvent(shop: string, eventType: string, data: any) {
   try {
+    // Shop'u veritabanına kaydet (eğer yoksa)
+    await ensureShopExists(shop);
+    
     switch (eventType) {
       case 'heartbeat':
         await activeUsersManager.processHeartbeat(data);
