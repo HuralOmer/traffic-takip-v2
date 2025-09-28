@@ -62,7 +62,7 @@ export {
 } from './lua-scripts';
 
 // Utility Functions
-export * from './utils';
+export * from './utils.js';
 
 // Default export
 export { SessionManager as default } from './session-manager';
