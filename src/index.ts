@@ -487,6 +487,18 @@ async function ensureShopExists(shop: string): Promise<void> {
   try {
     logger.info('Checking if shop exists', { shop });
     
+    // Önce basit bir test yapalım
+    try {
+      const { data: testData, error: testError } = await db.getServiceClient()
+        .from('shops')
+        .select('id')
+        .limit(1);
+      
+      logger.info('Database connection test', { testData, testError });
+    } catch (testErr) {
+      logger.error('Database connection test failed', { testErr });
+    }
+    
     // Shop'un var olup olmadığını kontrol et
     const { data: existingShop, error: checkError } = await db.getServiceClient()
       .from('shops')
@@ -497,47 +509,85 @@ async function ensureShopExists(shop: string): Promise<void> {
     logger.info('Shop check result', { 
       shop, 
       existingShop, 
-      checkError: checkError ? { code: checkError.code, message: checkError.message } : null 
+      checkError: checkError ? { 
+        code: checkError.code, 
+        message: checkError.message,
+        details: checkError.details,
+        hint: checkError.hint
+      } : null 
     });
 
     if (checkError && checkError.code === 'PGRST116') {
       // Shop yoksa oluştur (PGRST116 = row not found)
       logger.info('Creating shop record for universal tracking', { shop });
       
-      const { error: insertError } = await db.getServiceClient()
-        .from('shops')
-        .insert({
-          shop_domain: shop,
-          access_token: 'universal_tracking', // Universal tracking için özel token
-          shop_name: shop.replace('.myshopify.com', '').replace('.com', ''),
-          shop_email: '',
-          shop_currency: 'USD',
-          shop_timezone: 'UTC',
-          installed_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
+      try {
+        const { error: insertError } = await db.getServiceClient()
+          .from('shops')
+          .insert({
+            shop_domain: shop,
+            access_token: 'universal_tracking', // Universal tracking için özel token
+            shop_name: shop.replace('.myshopify.com', '').replace('.com', ''),
+            shop_email: '',
+            shop_currency: 'USD',
+            shop_timezone: 'UTC',
+            installed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
 
-      if (insertError) {
-        logger.error('Failed to create shop record', { shop, error: insertError });
-      } else {
-        logger.info('Shop record created successfully', { shop });
+        if (insertError) {
+          logger.error('Failed to create shop record', { 
+            shop, 
+            error: {
+              message: insertError.message,
+              code: insertError.code,
+              details: insertError.details,
+              hint: insertError.hint
+            }
+          });
+        } else {
+          logger.info('Shop record created successfully', { shop });
+        }
+      } catch (insertErr) {
+        logger.error('Exception during shop creation', { shop, insertErr });
       }
     } else if (existingShop) {
       // Shop zaten var, updated_at'i güncelle
       logger.info('Shop already exists, updating timestamp', { shop });
-      await db.getServiceClient()
-        .from('shops')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('shop_domain', shop);
+      try {
+        await db.getServiceClient()
+          .from('shops')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('shop_domain', shop);
+      } catch (updateErr) {
+        logger.error('Exception during shop update', { shop, updateErr });
+      }
     } else if (checkError) {
       // Başka bir hata var
-      logger.error('Error checking shop existence', { shop, error: checkError });
+      logger.error('Error checking shop existence', { 
+        shop, 
+        error: {
+          message: checkError.message,
+          code: checkError.code,
+          details: checkError.details,
+          hint: checkError.hint
+        }
+      });
     } else {
       // Shop var ama existingShop null
       logger.info('Shop exists but existingShop is null', { shop });
     }
   } catch (error) {
-    logger.error('Error ensuring shop exists', { shop, error });
+    logger.error('Error ensuring shop exists', { 
+      shop, 
+      error: error instanceof Error ? {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      } : error,
+      errorType: typeof error,
+      errorString: String(error)
+    });
   }
 }
 
@@ -2381,6 +2431,55 @@ async function start() {
         .header('Cross-Origin-Opener-Policy', 'unsafe-none')
         .header('Cross-Origin-Resource-Policy', 'cross-origin')
         .send();
+    });
+
+    // Debug endpoint - veritabanı bağlantısını test et
+    fastify.get('/debug/database', async (_request, reply) => {
+      try {
+        logger.info('Testing database connection...');
+        
+        // Service client ile test
+        const { data: serviceData, error: serviceError } = await db.getServiceClient()
+          .from('shops')
+          .select('count')
+          .limit(1);
+        
+        logger.info('Service client test result', { serviceData, serviceError });
+        
+        // Normal client ile test
+        const { data: normalData, error: normalError } = await db.getClient()
+          .from('shops')
+          .select('count')
+          .limit(1);
+        
+        logger.info('Normal client test result', { normalData, normalError });
+        
+        reply.send({
+          success: true,
+          serviceClient: {
+            data: serviceData,
+            error: serviceError ? {
+              message: serviceError.message,
+              code: serviceError.code,
+              details: serviceError.details
+            } : null
+          },
+          normalClient: {
+            data: normalData,
+            error: normalError ? {
+              message: normalError.message,
+              code: normalError.code,
+              details: normalError.details
+            } : null
+          }
+        });
+      } catch (error) {
+        logger.error('Database debug error', { error });
+        reply.status(500).send({
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
     });
 
     // HMAC middleware geçici olarak devre dışı
