@@ -1840,12 +1840,262 @@ async function start() {
     // Universal tracking script endpoint (herhangi bir web sitesi için)
     fastify.get('/public/universal-tracking.js', async (_request, reply) => {
       try {
-        // Public klasöründeki universal tracking script'ini oku
-        const fs = await import('fs');
-        const path = await import('path');
-        
-        const scriptPath = path.join(__dirname, '../public/universal-tracking.js');
-        const scriptContent = fs.readFileSync(scriptPath, 'utf8');
+        // Universal tracking script'ini inline olarak döndür
+        const scriptContent = `// HRL Universal Traffic Tracking Script
+(function () {
+  'use strict';
+
+  // ---- Configuration ---------------------------------------------------------
+  const CONFIG = {
+    // API endpoint - buraya kendi domain'inizi yazın
+    apiUrl: '${process.env['SHOPIFY_APP_URL']}',
+    // Shop domain - buraya tracking yapılacak site domain'ini yazın
+    shop: window.location.hostname,
+    // Tracking interval (ms)
+    heartbeatInterval: 10000,
+    // Session timeout (ms)
+    sessionTimeout: 30000
+  };
+
+  // ---- Helpers --------------------------------------------------------------
+  function uid(prefix) {
+    return \`\${prefix}_\${Date.now().toString(36)}_\${Math.random().toString(36).slice(2, 8)}\`;
+  }
+
+  function getOrSetLS(key, gen) {
+    let v = localStorage.getItem(key);
+    if (!v) {
+      v = gen();
+      localStorage.setItem(key, v);
+    }
+    return v;
+  }
+
+  // ---- State Management -----------------------------------------------------
+  const HRL = {
+    config: CONFIG,
+    visitorId: getOrSetLS('hrl_visitor_id', () => uid('visitor')),
+    sessionId: getOrSetLS('hrl_session_id', () => uid('session')),
+    initialized: false,
+    currentSession: null,
+    sessionStartTime: null,
+    heartbeatTimer: null,
+    startTime: Date.now()
+  };
+
+  // ---- API Functions --------------------------------------------------------
+  function createPayload(type, extra = {}) {
+    return {
+      type: type,
+      shop: HRL.config.shop,
+      visitor_id: HRL.visitorId,
+      session_id: HRL.sessionId,
+      page_path: location.pathname,
+      page_title: document.title,
+      referrer: document.referrer,
+      timestamp: Date.now(),
+      user_agent: navigator.userAgent,
+      lang: navigator.language,
+      ...extra
+    };
+  }
+
+  function sendData(endpoint, data) {
+    console.log('HRL Tracking: Sending data', data);
+    
+    return fetch(\`\${HRL.config.apiUrl}\${endpoint}\`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(data),
+      mode: 'cors',
+      credentials: 'omit'
+    })
+    .then(response => {
+      console.log('HRL Tracking: Response received', response.status);
+      if (!response.ok) {
+        throw new Error(\`HTTP \${response.status}: \${response.statusText}\`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      console.log('HRL Tracking: Data processed', data);
+      return data;
+    })
+    .catch(error => {
+      console.warn('HRL Tracking: Send error', error);
+      throw error;
+    });
+  }
+
+  // ---- Session Management ---------------------------------------------------
+  function startSession() {
+    if (HRL.currentSession) return Promise.resolve();
+    
+    HRL.sessionStartTime = Date.now();
+    const sessionData = {
+      shop: HRL.config.shop,
+      visitor_id: HRL.visitorId,
+      page_path: location.pathname,
+      referrer: document.referrer,
+      user_agent: navigator.userAgent,
+      ip_hash: 'unknown' // Will be set by server
+    };
+
+    console.log('HRL Tracking: Starting session', sessionData);
+    
+    return sendData('/api/sessions/start', sessionData)
+      .then(data => {
+        if (data.success) {
+          HRL.currentSession = data.session_id;
+          console.log('HRL Tracking: Session started', data);
+        }
+        return data;
+      })
+      .catch(error => {
+        console.warn('HRL Tracking: Session start error', error);
+        throw error;
+      });
+  }
+
+  function endSession() {
+    if (!HRL.currentSession) return Promise.resolve();
+    
+    const sessionData = {
+      shop: HRL.config.shop,
+      visitor_id: HRL.visitorId,
+      session_id: HRL.currentSession,
+      last_page: location.pathname
+    };
+
+    console.log('HRL Tracking: Ending session', sessionData);
+    
+    return sendData('/api/sessions/end', sessionData)
+      .then(data => {
+        console.log('HRL Tracking: Session ended', data);
+        HRL.currentSession = null;
+        return data;
+      })
+      .catch(error => {
+        console.warn('HRL Tracking: Session end error', error);
+        throw error;
+      });
+  }
+
+  function updateSession() {
+    if (!HRL.currentSession) return Promise.resolve();
+    
+    const sessionData = {
+      shop: HRL.config.shop,
+      visitor_id: HRL.visitorId,
+      session_id: HRL.currentSession,
+      page_path: location.pathname
+    };
+
+    return sendData('/api/sessions/update', sessionData)
+      .catch(error => {
+        console.warn('HRL Tracking: Session update error', error);
+        throw error;
+      });
+  }
+
+  // ---- Tracking Functions ---------------------------------------------------
+  function track(type, extra = {}) {
+    const payload = createPayload(type, extra);
+    return sendData('/app-proxy/collect', payload);
+  }
+
+  function trackPageView() {
+    return track('page_view');
+  }
+
+  function trackPageUnload() {
+    return track('page_unload', { since_ms: Date.now() - HRL.startTime });
+  }
+
+  // ---- Heartbeat Management ------------------------------------------------
+  function startHeartbeat() {
+    // Start session first
+    startSession();
+    
+    // First heartbeat
+    track('heartbeat', { since_ms: 0 });
+    
+    // Periodic heartbeat
+    HRL.heartbeatTimer = setInterval(() => {
+      track('heartbeat', { since_ms: Date.now() - HRL.startTime });
+      updateSession(); // Update session on each heartbeat
+    }, HRL.config.heartbeatInterval);
+  }
+
+  function stopHeartbeat() {
+    if (HRL.heartbeatTimer) {
+      clearInterval(HRL.heartbeatTimer);
+      HRL.heartbeatTimer = null;
+    }
+    // End session when stopping heartbeat
+    endSession();
+  }
+
+  // ---- Initialization ------------------------------------------------------
+  function init() {
+    if (HRL.initialized) return;
+    
+    console.log('HRL Tracking: Initializing...');
+    console.log('HRL Tracking: Shop:', HRL.config.shop);
+    console.log('HRL Tracking: API URL:', HRL.config.apiUrl);
+    
+    // Page view
+    trackPageView();
+    
+    // Heartbeat
+    startHeartbeat();
+    
+    // Page unload
+    window.addEventListener('beforeunload', () => {
+      trackPageUnload();
+      endSession(); // End session on page unload
+    });
+    
+    // Visibility change (tab switch)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        console.log('HRL Tracking: Page hidden');
+      } else {
+        console.log('HRL Tracking: Page visible');
+        updateSession();
+      }
+    });
+    
+    HRL.initialized = true;
+    console.log('HRL Tracking: Initialized successfully');
+  }
+
+  // ---- Auto-start ----------------------------------------------------------
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // ---- Global API ----------------------------------------------------------
+  window.HRL = {
+    track: track,
+    config: HRL.config,
+    initialized: () => HRL.initialized,
+    startSession: startSession,
+    endSession: endSession,
+    updateSession: updateSession,
+    startHeartbeat: startHeartbeat,
+    stopHeartbeat: stopHeartbeat,
+    // Configuration methods
+    setShop: (shop) => { HRL.config.shop = shop; },
+    setApiUrl: (url) => { HRL.config.apiUrl = url; }
+  };
+
+})();`;
         
         reply
           .type('application/javascript')
@@ -1859,7 +2109,7 @@ async function start() {
           .send(scriptContent);
       } catch (error) {
         logger.error('Failed to serve universal tracking script', { error });
-        reply.status(404).send('Tracking script not found');
+        reply.status(500).send('// HRL Tracking Script Error');
       }
     });
 
