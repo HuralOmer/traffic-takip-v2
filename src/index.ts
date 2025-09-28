@@ -456,6 +456,10 @@ async function registerPlugins() {
   await fastify.register(cors, {
     origin: true,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-Shop', 'Accept'],
+    exposedHeaders: ['Content-Length', 'X-Request-Id'],
+    maxAge: 86400, // 24 hours
   });
 
   // Güvenlik başlıkları (Helmet)
@@ -1833,8 +1837,46 @@ async function start() {
         .send(trackingScript);
     });
 
+    // Universal tracking script endpoint (herhangi bir web sitesi için)
+    fastify.get('/public/universal-tracking.js', async (_request, reply) => {
+      try {
+        // Public klasöründeki universal tracking script'ini oku
+        const fs = await import('fs');
+        const path = await import('path');
+        
+        const scriptPath = path.join(__dirname, '../public/universal-tracking.js');
+        const scriptContent = fs.readFileSync(scriptPath, 'utf8');
+        
+        reply
+          .type('application/javascript')
+          .header('Cache-Control', 'public, max-age=300')
+          .header('Access-Control-Allow-Origin', '*')
+          .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+          .header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With')
+          .header('Access-Control-Allow-Credentials', 'false')
+          .header('X-Content-Type-Options', 'nosniff')
+          .header('X-Frame-Options', 'ALLOWALL')
+          .send(scriptContent);
+      } catch (error) {
+        logger.error('Failed to serve universal tracking script', { error });
+        reply.status(404).send('Tracking script not found');
+      }
+    });
+
     // CORS için OPTIONS endpoint
     fastify.options('/app-proxy/tracking.js', async (_request, reply) => {
+      reply
+        .header('Access-Control-Allow-Origin', '*')
+        .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        .header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With')
+        .header('Access-Control-Allow-Credentials', 'false')
+        .header('X-Content-Type-Options', 'nosniff')
+        .header('X-Frame-Options', 'ALLOWALL')
+        .send();
+    });
+
+    // Universal tracking script için OPTIONS endpoint
+    fastify.options('/public/universal-tracking.js', async (_request, reply) => {
       reply
         .header('Access-Control-Allow-Origin', '*')
         .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
