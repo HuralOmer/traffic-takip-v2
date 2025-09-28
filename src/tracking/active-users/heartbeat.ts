@@ -27,6 +27,8 @@ export class HeartbeatManager {
     try {
       const { shop, visitor_id, session_id, page_path, timestamp, user_agent } = payload;
 
+      console.log('HeartbeatManager: Processing heartbeat', { shop, visitor_id, session_id, page_path });
+
       // Presence data oluştur
       const presenceData: PresenceData = {
         shop,
@@ -37,12 +39,16 @@ export class HeartbeatManager {
         user_agent: user_agent || undefined,
       };
 
+      console.log('HeartbeatManager: Created presence data', presenceData);
+
       // Visitor presence'ını güncelle
       await this.presenceTracker.updateVisitorPresence(presenceData);
+      console.log('HeartbeatManager: Updated visitor presence');
 
       // Session varsa session presence'ını da güncelle
       if (session_id) {
         await this.presenceTracker.updateSessionPresence(presenceData);
+        console.log('HeartbeatManager: Updated session presence');
       }
 
       // Heartbeat timeout'ını ayarla
