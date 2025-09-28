@@ -177,12 +177,26 @@ export class PresenceTracker {
         const member = members[i] as string;
         
         try {
-          const data = JSON.parse(member) as RedisPresenceData;
+          // Member'ı string olarak kontrol et
+          let data: RedisPresenceData;
+          if (typeof member === 'string') {
+            data = JSON.parse(member) as RedisPresenceData;
+          } else {
+            // Eğer object ise, string'e çevir
+            data = JSON.parse(JSON.stringify(member)) as RedisPresenceData;
+          }
+          
           if (data.visitor_id === visitor_id) {
             await redis.getClient().zrem(key, member);
           }
         } catch (parseError) {
-          console.warn('Error parsing member for removal:', parseError);
+          console.warn('Error parsing member for removal:', parseError, 'Member:', member);
+          // Parse edilemeyen member'ı da sil
+          try {
+            await redis.getClient().zrem(key, member);
+          } catch (removalError) {
+            console.warn('Error removing invalid member:', removalError);
+          }
         }
       }
 
@@ -214,12 +228,26 @@ export class PresenceTracker {
         const member = members[i] as string;
         
         try {
-          const data = JSON.parse(member) as RedisPresenceData;
+          // Member'ı string olarak kontrol et
+          let data: RedisPresenceData;
+          if (typeof member === 'string') {
+            data = JSON.parse(member) as RedisPresenceData;
+          } else {
+            // Eğer object ise, string'e çevir
+            data = JSON.parse(JSON.stringify(member)) as RedisPresenceData;
+          }
+          
           if (data.session_id === session_id) {
             await redis.getClient().zrem(key, member);
           }
         } catch (parseError) {
-          console.warn('Error parsing member for removal:', parseError);
+          console.warn('Error parsing member for removal:', parseError, 'Member:', member);
+          // Parse edilemeyen member'ı da sil
+          try {
+            await redis.getClient().zrem(key, member);
+          } catch (removalError) {
+            console.warn('Error removing invalid member:', removalError);
+          }
         }
       }
 
