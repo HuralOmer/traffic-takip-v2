@@ -474,12 +474,25 @@ export class PresenceTracker {
         const member = members[i];
         
         try {
+          // UUID formatını kontrol et (UUID'ler direkt string olarak saklanıyor)
+          if (typeof member === 'string' && member === session_id) {
+            // UUID ise direkt sil
+            await redis.getClient().zrem(key, member);
+            console.log('PresenceTracker: Removed old session entry', { session_id, member });
+            continue;
+          }
+          
           let data: RedisPresenceData;
           
           // Member'ın tipini kontrol et
           if (typeof member === 'string') {
             // JSON string ise parse et
-            data = JSON.parse(member) as RedisPresenceData;
+            try {
+              data = JSON.parse(member) as RedisPresenceData;
+            } catch (jsonError) {
+              // JSON değilse UUID olabilir, skip et
+              continue;
+            }
           } else if (typeof member === 'object' && member !== null) {
             // Object ise direkt kullan
             data = member as RedisPresenceData;

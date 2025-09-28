@@ -481,6 +481,13 @@ export class SessionManager {
    */
   private async saveSessionToDatabase(sessionData: Partial<SessionData>): Promise<void> {
     try {
+      // RLS policy için current_shop değerini set et
+      await db.getClient().rpc('set_config', {
+        setting_name: 'app.current_shop',
+        new_value: sessionData.shop,
+        is_local: true
+      });
+
       const { error } = await db.getClient()
         .from(DB_TABLES.SESSIONS)
         .insert([sessionData]);
