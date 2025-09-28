@@ -1708,34 +1708,6 @@ async function registerRoutes() {
       }
     });
 
-    // Debug endpoint - Redis verilerini temizle
-    fastify.post('/api/debug/clear-redis', async (request, reply) => {
-      try {
-        const { shop } = request.query as { shop?: string };
-        if (!shop) {
-          reply.status(400).send({ error: 'Shop parameter required' });
-          return;
-        }
-
-        // Redis'teki tüm presence verilerini temizle
-        const visitorKey = `presence:v:${shop}`;
-        const sessionKey = `presence:s:${shop}`;
-        
-        await redis.getClient().del(visitorKey);
-        await redis.getClient().del(sessionKey);
-        
-        logger.info('Redis cleared for shop', { shop, visitorKey, sessionKey });
-        
-        reply.send({
-          success: true,
-          message: 'Redis data cleared',
-          cleared_keys: [visitorKey, sessionKey]
-        });
-      } catch (error) {
-        logger.error('Redis clear failed', { error });
-        reply.status(500).send({ error: 'Redis clear failed' });
-      }
-    });
   });
 }
 
