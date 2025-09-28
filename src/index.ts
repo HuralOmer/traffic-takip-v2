@@ -1329,6 +1329,173 @@ async function registerRoutes() {
       }
     });
 
+    // Sessions API endpoints
+    // Session başlatma endpoint'i
+    fastify.post('/api/sessions/start', async (request, reply) => {
+      try {
+        const { shop, visitor_id, page_path, referrer, user_agent, ip_hash } = request.body as any;
+        
+        if (!shop || !visitor_id || !page_path) {
+          reply.status(400).send({ 
+            success: false, 
+            error: 'Missing required fields: shop, visitor_id, page_path' 
+          });
+          return;
+        }
+
+        const sessionManager = new (await import('./tracking/sessions')).SessionManager();
+        await sessionManager.start();
+
+        const result = await sessionManager.startSession({
+          shop,
+          visitor_id,
+          page_path,
+          referrer,
+          user_agent,
+          ip_hash
+        });
+
+        reply.send(result);
+      } catch (error) {
+        logger.error('Session start failed', { error });
+        reply.status(500).send({ 
+          success: false, 
+          error: 'Session start failed' 
+        });
+      }
+    });
+
+    // Session sonlandırma endpoint'i
+    fastify.post('/api/sessions/end', async (request, reply) => {
+      try {
+        const { shop, visitor_id, session_id, last_page } = request.body as any;
+        
+        if (!shop || !visitor_id || !session_id) {
+          reply.status(400).send({ 
+            success: false, 
+            error: 'Missing required fields: shop, visitor_id, session_id' 
+          });
+          return;
+        }
+
+        const sessionManager = new (await import('./tracking/sessions')).SessionManager();
+        await sessionManager.start();
+
+        const result = await sessionManager.endSession({
+          shop,
+          visitor_id,
+          session_id,
+          last_page
+        });
+
+        reply.send(result);
+      } catch (error) {
+        logger.error('Session end failed', { error });
+        reply.status(500).send({ 
+          success: false, 
+          error: 'Session end failed' 
+        });
+      }
+    });
+
+    // Session güncelleme endpoint'i (heartbeat)
+    fastify.post('/api/sessions/update', async (request, reply) => {
+      try {
+        const { shop, visitor_id, session_id, page_path } = request.body as any;
+        
+        if (!shop || !visitor_id || !session_id || !page_path) {
+          reply.status(400).send({ 
+            success: false, 
+            error: 'Missing required fields: shop, visitor_id, session_id, page_path' 
+          });
+          return;
+        }
+
+        const sessionManager = new (await import('./tracking/sessions')).SessionManager();
+        await sessionManager.start();
+
+        const success = await sessionManager.updateSession({
+          shop,
+          visitor_id,
+          session_id,
+          page_path
+        });
+
+        reply.send({ 
+          success, 
+          message: success ? 'Session updated successfully' : 'Session update failed' 
+        });
+      } catch (error) {
+        logger.error('Session update failed', { error });
+        reply.status(500).send({ 
+          success: false, 
+          error: 'Session update failed' 
+        });
+      }
+    });
+
+    // Session dağılımı endpoint'i
+    fastify.get('/api/sessions/distribution', async (request, reply) => {
+      try {
+        const { shop } = request.query as { shop?: string };
+        if (!shop) {
+          reply.status(400).send({ error: 'Shop parameter required' });
+          return;
+        }
+
+        const sessionManager = new (await import('./tracking/sessions')).SessionManager();
+        await sessionManager.start();
+
+        const distribution = await sessionManager.getSessionDistribution(shop);
+        const activeSessions = await sessionManager.getActiveSessionCount(shop);
+
+        reply.send({
+          success: true,
+          data: {
+            distribution,
+            active_sessions: activeSessions,
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (error) {
+        logger.error('Session distribution retrieval failed', { error });
+        reply.status(500).send({ error: 'Session distribution retrieval failed' });
+      }
+    });
+
+    // Session analitikleri endpoint'i
+    fastify.get('/api/sessions/analytics', async (request, reply) => {
+      try {
+        const { shop, time_range = 'today' } = request.query as { 
+          shop?: string; 
+          time_range?: 'today' | '7d' | '30d' | '90d' 
+        };
+        
+        if (!shop) {
+          reply.status(400).send({ error: 'Shop parameter required' });
+          return;
+        }
+
+        const sessionManager = new (await import('./tracking/sessions')).SessionManager();
+        await sessionManager.start();
+
+        const analytics = await sessionManager.getSessionAnalytics(shop, time_range);
+
+        reply.send({
+          success: true,
+          data: {
+            analytics,
+            time_range,
+            shop,
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (error) {
+        logger.error('Session analytics retrieval failed', { error });
+        reply.status(500).send({ error: 'Session analytics retrieval failed' });
+      }
+    });
+
     // Debug endpoint - Redis verilerini temizle
     fastify.post('/api/debug/clear-redis', async (request, reply) => {
       try {
