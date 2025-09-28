@@ -425,16 +425,35 @@ export class PresenceTracker {
       const members = await redis.getClient().zrange(key, '-inf', '+inf', { byScore: true, withScores: true });
       
       for (let i = 0; i < members.length; i += 2) {
-        const member = members[i] as string;
+        const member = members[i];
         
         try {
-          const data = JSON.parse(member) as RedisPresenceData;
+          let data: RedisPresenceData;
+          
+          // Member'ın tipini kontrol et
+          if (typeof member === 'string') {
+            // JSON string ise parse et
+            data = JSON.parse(member) as RedisPresenceData;
+          } else if (typeof member === 'object' && member !== null) {
+            // Object ise direkt kullan
+            data = member as RedisPresenceData;
+          } else {
+            console.warn('Unknown member type:', typeof member, member);
+            continue;
+          }
+          
           if (data.visitor_id === visitor_id) {
             await redis.getClient().zrem(key, member);
             console.log('PresenceTracker: Removed old visitor entry', { visitor_id, member });
           }
         } catch (parseError) {
           console.warn('Error parsing member for removal:', parseError, 'Member:', member);
+          // Parse edilemeyen member'ı da sil
+          try {
+            await redis.getClient().zrem(key, member);
+          } catch (removalError) {
+            console.warn('Error removing invalid member:', removalError);
+          }
         }
       }
     } catch (error) {
@@ -452,16 +471,35 @@ export class PresenceTracker {
       const members = await redis.getClient().zrange(key, '-inf', '+inf', { byScore: true, withScores: true });
       
       for (let i = 0; i < members.length; i += 2) {
-        const member = members[i] as string;
+        const member = members[i];
         
         try {
-          const data = JSON.parse(member) as RedisPresenceData;
+          let data: RedisPresenceData;
+          
+          // Member'ın tipini kontrol et
+          if (typeof member === 'string') {
+            // JSON string ise parse et
+            data = JSON.parse(member) as RedisPresenceData;
+          } else if (typeof member === 'object' && member !== null) {
+            // Object ise direkt kullan
+            data = member as RedisPresenceData;
+          } else {
+            console.warn('Unknown member type:', typeof member, member);
+            continue;
+          }
+          
           if (data.session_id === session_id) {
             await redis.getClient().zrem(key, member);
             console.log('PresenceTracker: Removed old session entry', { session_id, member });
           }
         } catch (parseError) {
           console.warn('Error parsing member for removal:', parseError, 'Member:', member);
+          // Parse edilemeyen member'ı da sil
+          try {
+            await redis.getClient().zrem(key, member);
+          } catch (removalError) {
+            console.warn('Error removing invalid member:', removalError);
+          }
         }
       }
     } catch (error) {
