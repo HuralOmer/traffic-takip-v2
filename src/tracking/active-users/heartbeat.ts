@@ -25,16 +25,16 @@ export class HeartbeatManager {
    */
   public async processHeartbeat(payload: HeartbeatPayload): Promise<HeartbeatResponse> {
     try {
-      const { shop, visitor_id, session_id, page_path, timestamp, user_agent } = payload;
+      const { shop, visitor_id, session_id, page_path, user_agent } = payload;
 
       console.log('HeartbeatManager: Processing heartbeat', { shop, visitor_id, session_id, page_path });
 
-      // Presence data oluştur
+      // Presence data oluştur - Server timestamp kullan
       const presenceData: PresenceData = {
         shop,
         visitor_id,
         session_id: session_id || undefined,
-        timestamp: timestamp || Date.now(),
+        timestamp: Date.now(), // Her zaman server timestamp kullan
         page_path,
         user_agent: user_agent || undefined,
       };

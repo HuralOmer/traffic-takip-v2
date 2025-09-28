@@ -58,7 +58,8 @@ export class PresenceTracker {
 
     console.log('PresenceTracker: Adding to Redis', { key, member, score: timestamp });
 
-    // ZADD ile timestamp'i score olarak kullan
+    // Önce eski entry'yi sil, sonra yenisini ekle (unique visitor tracking)
+    await redis.getClient().zrem(key, member);
     await redis.getClient().zadd(key, { score: timestamp, member });
     
     console.log('PresenceTracker: Successfully added to Redis');
@@ -94,7 +95,8 @@ export class PresenceTracker {
       ip_hash,
     } as RedisPresenceData);
 
-    // ZADD ile timestamp'i score olarak kullan
+    // Önce eski entry'yi sil, sonra yenisini ekle (unique session tracking)
+    await redis.getClient().zrem(key, member);
     await redis.getClient().zadd(key, { score: timestamp, member });
     
     // TTL ayarla
