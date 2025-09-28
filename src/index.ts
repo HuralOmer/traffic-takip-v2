@@ -1409,25 +1409,21 @@ async function registerRoutes() {
 
         logger.info('Starting Redis cleanup for shop', { shop });
 
-        // Clear all Redis keys for this shop - use direct key deletion
+        // Clear all Redis keys for this shop - use simple approach
         const keysToDelete = [
           `presence:v:${shop}`,
           `presence:s:${shop}`,
           `vis:session-count:${shop}`,
-          `hist:sessions:${shop}`,
-          `visitor:current_session:${shop}:*`,
-          `session:meta:${shop}:*`
+          `hist:sessions:${shop}`
         ];
 
         let clearedCount = 0;
         for (const key of keysToDelete) {
           try {
             // Try to delete the key directly
-            const result = await redis.getClient().del(key);
-            if (result > 0) {
-              clearedCount += result;
-              logger.info('Cleared key', { key, result });
-            }
+            await redis.getClient().del(key);
+            clearedCount++;
+            logger.info('Cleared key', { key });
           } catch (keyError) {
             logger.warn('Error clearing key', { key, error: keyError });
           }

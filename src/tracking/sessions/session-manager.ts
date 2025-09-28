@@ -28,6 +28,7 @@ import {
   SUCCESS_MESSAGES
 } from './constants';
 import { LUA_SCRIPTS } from './lua-scripts';
+import { randomUUID } from 'crypto';
 
 export class SessionManager {
   private cleanupInterval: NodeJS.Timeout | undefined;
@@ -119,7 +120,7 @@ export class SessionManager {
           if (sessionGap > SESSION_GAP_MS) {
             // Yeni session başlat
             previousSessionId = currentSessionId;
-            sessionId = `session_${visitor_id}_${timestamp}_${Math.floor(Math.random() * 900000) + 100000}`;
+            sessionId = randomUUID();
             isNewSession = true;
           } else {
             // Mevcut session'ı güncelle
@@ -129,7 +130,7 @@ export class SessionManager {
         }
       } else {
         // Yeni session başlat
-        sessionId = `session_${visitor_id}_${timestamp}_${Math.floor(Math.random() * 900000) + 100000}`;
+        sessionId = randomUUID();
         isNewSession = true;
       }
       
