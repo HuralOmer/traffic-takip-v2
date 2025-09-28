@@ -116,10 +116,13 @@ export class SessionManager {
 
       console.log('SessionManager: Session start result', result);
 
+      // Lua script'ten dönen result'ı parse et
+      const sessionResult = Array.isArray(result) ? result[0] : result;
+      
       // Eğer yeni session başlatıldıysa Supabase'e kaydet
-      if (result.is_new_session) {
+      if (sessionResult && sessionResult.is_new_session) {
         await this.saveSessionToDatabase({
-          session_id: result.session_id,
+          session_id: sessionResult.session_id,
           shop,
           visitor_id,
           started_at: new Date(timestamp),
@@ -138,10 +141,10 @@ export class SessionManager {
       return {
         success: true,
         message: SUCCESS_MESSAGES.SESSION_STARTED,
-        session_id: result.session_id,
-        is_new_session: result.is_new_session,
-        previous_session_id: result.previous_session_id,
-        session_gap_ms: result.session_gap_ms
+        session_id: sessionResult.session_id,
+        is_new_session: sessionResult.is_new_session,
+        previous_session_id: sessionResult.previous_session_id,
+        session_gap_ms: sessionResult.session_gap_ms
       };
 
     } catch (error) {
@@ -183,27 +186,30 @@ export class SessionManager {
 
       console.log('SessionManager: Session end result', result);
 
-      if (result.success) {
+      // Lua script'ten dönen result'ı parse et
+      const sessionResult = Array.isArray(result) ? result[0] : result;
+
+      if (sessionResult && sessionResult.success) {
         // Supabase'de session'ı güncelle
         await this.updateSessionInDatabase(session_id, {
           ended_at: new Date(timestamp),
           last_page,
-          duration_ms: result.duration_ms,
-          page_count: result.page_count,
+          duration_ms: sessionResult.duration_ms,
+          page_count: sessionResult.page_count,
           is_ended: true
         });
 
         return {
           success: true,
           message: SUCCESS_MESSAGES.SESSION_ENDED,
-          session_id: result.session_id,
-          duration_ms: result.duration_ms,
-          page_count: result.page_count
+          session_id: sessionResult.session_id,
+          duration_ms: sessionResult.duration_ms,
+          page_count: sessionResult.page_count
         };
       } else {
         return {
           success: false,
-          message: result.error || ERROR_MESSAGES.SESSION_NOT_FOUND,
+          message: sessionResult?.error || ERROR_MESSAGES.SESSION_NOT_FOUND,
           session_id
         };
       }
@@ -243,11 +249,14 @@ export class SessionManager {
         [session_id, timestamp.toString(), page_path]
       ) as any;
 
-      if (result.success) {
+      // Lua script'ten dönen result'ı parse et
+      const sessionResult = Array.isArray(result) ? result[0] : result;
+
+      if (sessionResult && sessionResult.success) {
         // Supabase'de session'ı güncelle
         await this.updateSessionInDatabase(session_id, {
           last_page: page_path,
-          page_count: result.page_count
+          page_count: sessionResult.page_count
         });
 
         return true;

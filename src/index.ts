@@ -1569,8 +1569,7 @@ async function registerRoutes() {
           return;
         }
 
-        const sessionManager = new (await import('./tracking/sessions')).SessionManager();
-        await sessionManager.start();
+        // Global sessionManager instance'ını kullan
 
         const result = await sessionManager.startSession({
           shop,
@@ -1604,8 +1603,7 @@ async function registerRoutes() {
           return;
         }
 
-        const sessionManager = new (await import('./tracking/sessions')).SessionManager();
-        await sessionManager.start();
+        // Global sessionManager instance'ını kullan
 
         const result = await sessionManager.endSession({
           shop,
@@ -1637,8 +1635,7 @@ async function registerRoutes() {
           return;
         }
 
-        const sessionManager = new (await import('./tracking/sessions')).SessionManager();
-        await sessionManager.start();
+        // Global sessionManager instance'ını kullan
 
         const success = await sessionManager.updateSession({
           shop,
@@ -1669,8 +1666,7 @@ async function registerRoutes() {
           return;
         }
 
-        const sessionManager = new (await import('./tracking/sessions')).SessionManager();
-        await sessionManager.start();
+        // Global sessionManager instance'ını kullan
 
         const distribution = await sessionManager.getSessionDistribution(shop);
         const activeSessions = await sessionManager.getActiveSessionCount(shop);
@@ -1702,8 +1698,7 @@ async function registerRoutes() {
           return;
         }
 
-        const sessionManager = new (await import('./tracking/sessions')).SessionManager();
-        await sessionManager.start();
+        // Global sessionManager instance'ını kullan
 
         const analytics = await sessionManager.getSessionAnalytics(shop, time_range);
 
