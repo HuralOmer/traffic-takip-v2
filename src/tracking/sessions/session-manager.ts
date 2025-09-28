@@ -385,10 +385,16 @@ export class SessionManager {
 
       if (sessionResult && sessionResult.success) {
         // Supabase'de session'ı güncelle
-        await this.updateSessionInDatabase(session_id, {
-          last_page: page_path,
-          page_count: sessionResult.page_count
-        });
+        try {
+          await this.updateSessionInDatabase(session_id, {
+            last_page: page_path,
+            page_count: sessionResult.page_count
+          });
+          console.log('SessionManager: Session updated in database', { session_id, page_count: sessionResult.page_count });
+        } catch (dbError) {
+          console.error('SessionManager: Error updating session in database:', dbError);
+          // Database hatası olsa bile Redis'te güncelleme başarılı sayılır
+        }
 
         return true;
       }
@@ -503,15 +509,23 @@ export class SessionManager {
    */
   private async updateSessionInDatabase(sessionId: string, updates: Partial<SessionData>): Promise<void> {
     try {
+      // RLS policy için shop bilgisini ekle
+      const updateData = {
+        ...updates,
+        updated_at: new Date().toISOString()
+      };
+
       const { error } = await db.getClient()
         .from(DB_TABLES.SESSIONS)
-        .update(updates)
+        .update(updateData)
         .eq('session_id', sessionId);
 
       if (error) {
         console.error('SessionManager: Error updating session in database:', error);
         throw error;
       }
+
+      console.log('SessionManager: Session updated in database successfully', { sessionId, updates: updateData });
 
     } catch (error) {
       console.error('SessionManager: Error in updateSessionInDatabase:', error);
