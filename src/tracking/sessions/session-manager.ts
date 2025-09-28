@@ -139,9 +139,9 @@ export class SessionManager {
         await redis.getClient().hset(sessionMetaKey, {
           session_id: sessionId,
           visitor_id: visitor_id,
-          started_at: timestamp,
-          last_activity: timestamp,
-          page_count: 1,
+          started_at: timestamp.toString(),
+          last_activity: timestamp.toString(),
+          page_count: '1',
           first_page: page_path,
           last_page: page_path,
           referrer: referrer,
@@ -168,7 +168,7 @@ export class SessionManager {
       } else {
         // Mevcut session'ı güncelle
         await redis.getClient().hset(sessionMetaKey, {
-          last_activity: timestamp,
+          last_activity: timestamp.toString(),
           last_page: page_path
         });
         
@@ -273,11 +273,11 @@ export class SessionManager {
       
       // Session'ı sonlandır
       await redis.getClient().hset(sessionMetaKey, {
-        ended_at: timestamp,
+        ended_at: timestamp.toString(),
         last_page: last_page,
-        duration_ms: duration,
-        page_count: pageCount,
-        is_ended: true
+        duration_ms: duration.toString(),
+        page_count: pageCount.toString(),
+        is_ended: 'true'
       });
       
       // Presence set'ten kaldır
@@ -366,9 +366,9 @@ export class SessionManager {
       
       // Session'ı güncelle
       await redis.getClient().hset(sessionMetaKey, {
-        last_activity: timestamp,
+        last_activity: timestamp.toString(),
         last_page: page_path,
-        page_count: pageCount
+        page_count: pageCount.toString()
       });
       
       // Presence set'te güncelle
