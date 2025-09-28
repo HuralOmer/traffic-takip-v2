@@ -48,6 +48,11 @@ export class PresenceTracker {
     console.log('PresenceTracker: updateVisitorPresence called', { shop, visitor_id, timestamp });
     
     const key = `${REDIS_KEYS.PRESENCE_VISITORS}:${shop}`;
+    
+    // Önce eski entry'leri sil (visitor_id'ye göre)
+    await this.removeVisitorEntries(key, visitor_id);
+    
+    // Yeni entry'yi ekle
     const member = JSON.stringify({
       visitor_id,
       timestamp,
@@ -58,8 +63,6 @@ export class PresenceTracker {
 
     console.log('PresenceTracker: Adding to Redis', { key, member, score: timestamp });
 
-    // Önce eski entry'yi sil, sonra yenisini ekle (unique visitor tracking)
-    await redis.getClient().zrem(key, member);
     await redis.getClient().zadd(key, { score: timestamp, member });
     
     console.log('PresenceTracker: Successfully added to Redis');
@@ -87,6 +90,11 @@ export class PresenceTracker {
     if (!session_id) return;
 
     const key = `${REDIS_KEYS.PRESENCE_SESSIONS}:${shop}`;
+    
+    // Önce eski entry'leri sil (session_id'ye göre)
+    await this.removeSessionEntries(key, session_id);
+    
+    // Yeni entry'yi ekle
     const member = JSON.stringify({
       session_id,
       timestamp,
@@ -95,8 +103,6 @@ export class PresenceTracker {
       ip_hash,
     } as RedisPresenceData);
 
-    // Önce eski entry'yi sil, sonra yenisini ekle (unique session tracking)
-    await redis.getClient().zrem(key, member);
     await redis.getClient().zadd(key, { score: timestamp, member });
     
     // TTL ayarla
@@ -406,6 +412,60 @@ export class PresenceTracker {
     } catch (error) {
       console.error('Error getting last activity time:', error);
       return 0;
+    }
+  }
+
+  /**
+   * Visitor'ın eski entry'lerini siler
+   * @param key - Redis key
+   * @param visitor_id - Visitor kimliği
+   */
+  private async removeVisitorEntries(key: string, visitor_id: string): Promise<void> {
+    try {
+      const members = await redis.getClient().zrange(key, '-inf', '+inf', { byScore: true, withScores: true });
+      
+      for (let i = 0; i < members.length; i += 2) {
+        const member = members[i] as string;
+        
+        try {
+          const data = JSON.parse(member) as RedisPresenceData;
+          if (data.visitor_id === visitor_id) {
+            await redis.getClient().zrem(key, member);
+            console.log('PresenceTracker: Removed old visitor entry', { visitor_id, member });
+          }
+        } catch (parseError) {
+          console.warn('Error parsing member for removal:', parseError, 'Member:', member);
+        }
+      }
+    } catch (error) {
+      console.error('Error removing visitor entries:', error);
+    }
+  }
+
+  /**
+   * Session'ın eski entry'lerini siler
+   * @param key - Redis key
+   * @param session_id - Session kimliği
+   */
+  private async removeSessionEntries(key: string, session_id: string): Promise<void> {
+    try {
+      const members = await redis.getClient().zrange(key, '-inf', '+inf', { byScore: true, withScores: true });
+      
+      for (let i = 0; i < members.length; i += 2) {
+        const member = members[i] as string;
+        
+        try {
+          const data = JSON.parse(member) as RedisPresenceData;
+          if (data.session_id === session_id) {
+            await redis.getClient().zrem(key, member);
+            console.log('PresenceTracker: Removed old session entry', { session_id, member });
+          }
+        } catch (parseError) {
+          console.warn('Error parsing member for removal:', parseError, 'Member:', member);
+        }
+      }
+    } catch (error) {
+      console.error('Error removing session entries:', error);
     }
   }
 
