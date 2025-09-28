@@ -356,6 +356,130 @@ function generateDashboardHtml(shop: string): string {
 
 
 /**
+ * Referrer'ı analiz eder ve kaynak bilgisini döndürür
+ * @param referrer - Referrer URL
+ * @param userAgent - User Agent string
+ */
+function analyzeReferrer(referrer: string, userAgent: string): {
+  source: string;
+  platform: string;
+  isSocial: boolean;
+  isApp: boolean;
+  details: string;
+} {
+  const ua = userAgent.toLowerCase();
+  const ref = referrer.toLowerCase();
+  
+  // Instagram tespiti
+  if (ref.includes('instagram.com') || ua.includes('instagram')) {
+    return {
+      source: 'Instagram',
+      platform: ua.includes('instagram') ? 'Instagram App' : 'Instagram Web',
+      isSocial: true,
+      isApp: ua.includes('instagram'),
+      details: `Instagram ${ua.includes('instagram') ? 'App' : 'Web'} - ${referrer}`
+    };
+  }
+  
+  // Facebook tespiti
+  if (ref.includes('facebook.com') || ref.includes('fb.com') || ua.includes('fban') || ua.includes('fbav')) {
+    return {
+      source: 'Facebook',
+      platform: ua.includes('fban') || ua.includes('fbav') ? 'Facebook App' : 'Facebook Web',
+      isSocial: true,
+      isApp: ua.includes('fban') || ua.includes('fbav'),
+      details: `Facebook ${ua.includes('fban') || ua.includes('fbav') ? 'App' : 'Web'} - ${referrer}`
+    };
+  }
+  
+  // Twitter tespiti
+  if (ref.includes('twitter.com') || ref.includes('t.co') || ua.includes('twitter')) {
+    return {
+      source: 'Twitter',
+      platform: ua.includes('twitter') ? 'Twitter App' : 'Twitter Web',
+      isSocial: true,
+      isApp: ua.includes('twitter'),
+      details: `Twitter ${ua.includes('twitter') ? 'App' : 'Web'} - ${referrer}`
+    };
+  }
+  
+  // TikTok tespiti
+  if (ref.includes('tiktok.com') || ua.includes('tiktok')) {
+    return {
+      source: 'TikTok',
+      platform: ua.includes('tiktok') ? 'TikTok App' : 'TikTok Web',
+      isSocial: true,
+      isApp: ua.includes('tiktok'),
+      details: `TikTok ${ua.includes('tiktok') ? 'App' : 'Web'} - ${referrer}`
+    };
+  }
+  
+  // Google tespiti
+  if (ref.includes('google.com') || ref.includes('google.') || ua.includes('googlebot')) {
+    return {
+      source: 'Google',
+      platform: 'Google Search',
+      isSocial: false,
+      isApp: false,
+      details: `Google Search - ${referrer}`
+    };
+  }
+  
+  // YouTube tespiti
+  if (ref.includes('youtube.com') || ref.includes('youtu.be') || ua.includes('youtube')) {
+    return {
+      source: 'YouTube',
+      platform: ua.includes('youtube') ? 'YouTube App' : 'YouTube Web',
+      isSocial: true,
+      isApp: ua.includes('youtube'),
+      details: `YouTube ${ua.includes('youtube') ? 'App' : 'Web'} - ${referrer}`
+    };
+  }
+  
+  // WhatsApp tespiti
+  if (ua.includes('whatsapp')) {
+    return {
+      source: 'WhatsApp',
+      platform: 'WhatsApp App',
+      isSocial: true,
+      isApp: true,
+      details: `WhatsApp App - ${referrer || 'No referrer'}`
+    };
+  }
+  
+  // Telegram tespiti
+  if (ua.includes('telegram')) {
+    return {
+      source: 'Telegram',
+      platform: 'Telegram App',
+      isSocial: true,
+      isApp: true,
+      details: `Telegram App - ${referrer || 'No referrer'}`
+    };
+  }
+  
+  // Direct/Empty referrer
+  if (!referrer || referrer === '') {
+    return {
+      source: 'Direct',
+      platform: 'Direct Visit',
+      isSocial: false,
+      isApp: false,
+      details: 'Direct visit or bookmark'
+    };
+  }
+  
+  // External site
+  return {
+    source: 'External',
+    platform: 'External Website',
+    isSocial: false,
+    isApp: false,
+    details: `External site - ${referrer}`
+  };
+}
+
+/**
  * Shop'un veritabanında var olduğundan emin olur
  * @param shop - Mağaza kimliği
  */
@@ -435,6 +559,9 @@ async function processTrackingEvent(shop: string, eventType: string, data: any) 
         break;
         
       case 'page_view':
+        // Referrer analizi yap
+        const referrerAnalysis = analyzeReferrer(data.referrer || '', data.user_agent || '');
+        
         // Page view'i database'e kaydet
         await db.getServiceClient()
           .from('page_views')
@@ -445,8 +572,18 @@ async function processTrackingEvent(shop: string, eventType: string, data: any) 
             page_path: data.page_path,
             page_title: data.page_title,
             referrer: data.referrer,
+            referrer_source: referrerAnalysis.source,
+            referrer_platform: referrerAnalysis.platform,
+            is_social_traffic: referrerAnalysis.isSocial,
+            is_app_traffic: referrerAnalysis.isApp,
             timestamp: new Date(data.timestamp),
           });
+        
+        logger.info('Page view recorded with referrer analysis', {
+          shop,
+          referrer: data.referrer,
+          analysis: referrerAnalysis
+        });
         break;
         
       case 'page_close':
