@@ -361,6 +361,8 @@ function generateDashboardHtml(shop: string): string {
  */
 async function ensureShopExists(shop: string): Promise<void> {
   try {
+    logger.info('Checking if shop exists', { shop });
+    
     // Shop'un var olup olmadığını kontrol et
     const { data: existingShop, error: checkError } = await db.getServiceClient()
       .from('shops')
@@ -368,8 +370,14 @@ async function ensureShopExists(shop: string): Promise<void> {
       .eq('shop_domain', shop)
       .single();
 
-    if (checkError && checkError.code !== 'PGRST116') {
-      // Shop yoksa oluştur
+    logger.info('Shop check result', { 
+      shop, 
+      existingShop, 
+      checkError: checkError ? { code: checkError.code, message: checkError.message } : null 
+    });
+
+    if (checkError && checkError.code === 'PGRST116') {
+      // Shop yoksa oluştur (PGRST116 = row not found)
       logger.info('Creating shop record for universal tracking', { shop });
       
       const { error: insertError } = await db.getServiceClient()
@@ -392,10 +400,14 @@ async function ensureShopExists(shop: string): Promise<void> {
       }
     } else if (existingShop) {
       // Shop zaten var, updated_at'i güncelle
+      logger.info('Shop already exists, updating timestamp', { shop });
       await db.getServiceClient()
         .from('shops')
         .update({ updated_at: new Date().toISOString() })
         .eq('shop_domain', shop);
+    } else {
+      // Başka bir hata var
+      logger.error('Error checking shop existence', { shop, error: checkError });
     }
   } catch (error) {
     logger.error('Error ensuring shop exists', { shop, error });
