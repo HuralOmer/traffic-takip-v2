@@ -371,11 +371,22 @@ export class SessionManager {
 
       // Upstash Redis REST API'de Lua script'ler desteklenmiyor
       // Normal Redis komutlarını kullanarak session güncelleme
-      console.log('SessionManager: Updating session with Redis commands');
+      console.log('SessionManager: Updating session with Redis commands', { 
+        shop, 
+        visitor_id, 
+        session_id, 
+        page_path 
+      });
       
       // Session metadata'sını al
       const sessionData = await redis.getClient().hgetall(sessionMetaKey);
+      console.log('SessionManager: Session metadata retrieved', { 
+        sessionData, 
+        hasSessionId: sessionData ? !!sessionData['session_id'] : false
+      });
+      
       if (!sessionData || !sessionData['session_id']) {
+        console.log('SessionManager: No session data found, returning false');
         return false;
       }
       

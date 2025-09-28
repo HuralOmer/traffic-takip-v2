@@ -529,9 +529,12 @@ async function ensureShopExists(shop: string): Promise<void> {
         .from('shops')
         .update({ updated_at: new Date().toISOString() })
         .eq('shop_domain', shop);
-    } else {
+    } else if (checkError) {
       // Başka bir hata var
       logger.error('Error checking shop existence', { shop, error: checkError });
+    } else {
+      // Shop var ama existingShop null
+      logger.info('Shop exists but existingShop is null', { shop });
     }
   } catch (error) {
     logger.error('Error ensuring shop exists', { shop, error });
