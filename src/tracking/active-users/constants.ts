@@ -4,6 +4,7 @@
  * Bu dosya Active Users modülü için kullanılan sabit değerleri içerir.
  * EMA algoritması, presence tracking ve heartbeat mekanizması için gerekli
  * zaman aralıkları ve eşik değerleri tanımlanmıştır.
+ * "active user calisiyor. fakat temaya kodlar manuel enjekte eiliyor"
  */
 
 // Heartbeat ve Presence Tracking Constants

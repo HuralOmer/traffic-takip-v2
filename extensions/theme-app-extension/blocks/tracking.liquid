@@ -36,12 +36,17 @@
         shop: shop,
         endpoints: {
           config: ORIGIN + basePath + '/config.json?shop=' + encodeURIComponent(shop),
-          collect: ORIGIN + basePath + '/collect'
+          collect: ORIGIN + basePath + '/collect',
+          sessionStart: ORIGIN + '/api/sessions/start',
+          sessionEnd: ORIGIN + '/api/sessions/end',
+          sessionUpdate: ORIGIN + '/api/sessions/update'
         }
       },
       visitorId: getOrSetLS('hrl_visitor_id', function() { return uid('visitor'); }),
       sessionId: getOrSetLS('hrl_session_id', function() { return uid('session'); }),
-      initialized: false
+      initialized: false,
+      currentSession: null,
+      sessionStartTime: null
     };
 
     // ---- tracking functions -------------------------------------------------
@@ -81,15 +86,92 @@
       send(payload(type, extra));
     }
 
+    // ---- session management -------------------------------------------------
+    function startSession() {
+      if (HRL.currentSession) return; // Session already started
+      
+      HRL.sessionStartTime = Date.now();
+      const sessionData = {
+        shop: HRL.config.shop,
+        visitor_id: HRL.visitorId,
+        page_path: location.pathname,
+        referrer: document.referrer,
+        user_agent: navigator.userAgent,
+        ip_hash: 'unknown' // Will be set by server
+      };
+
+      console.log('HRL Tracking: Starting session', sessionData);
+      
+      fetch(HRL.config.endpoints.sessionStart, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionData)
+      }).then(response => response.json()).then(data => {
+        if (data.success) {
+          HRL.currentSession = data.session_id;
+          console.log('HRL Tracking: Session started', data);
+        }
+      }).catch(error => {
+        console.warn('HRL Tracking: Session start error', error);
+      });
+    }
+
+    function endSession() {
+      if (!HRL.currentSession) return;
+      
+      const sessionData = {
+        shop: HRL.config.shop,
+        visitor_id: HRL.visitorId,
+        session_id: HRL.currentSession,
+        last_page: location.pathname
+      };
+
+      console.log('HRL Tracking: Ending session', sessionData);
+      
+      fetch(HRL.config.endpoints.sessionEnd, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionData)
+      }).then(response => response.json()).then(data => {
+        console.log('HRL Tracking: Session ended', data);
+        HRL.currentSession = null;
+      }).catch(error => {
+        console.warn('HRL Tracking: Session end error', error);
+      });
+    }
+
+    function updateSession() {
+      if (!HRL.currentSession) return;
+      
+      const sessionData = {
+        shop: HRL.config.shop,
+        visitor_id: HRL.visitorId,
+        session_id: HRL.currentSession,
+        page_path: location.pathname
+      };
+
+      fetch(HRL.config.endpoints.sessionUpdate, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sessionData)
+      }).catch(error => {
+        console.warn('HRL Tracking: Session update error', error);
+      });
+    }
+
     // ---- heartbeat ----------------------------------------------------------
     var hbTimer = null;
     var startTs = Date.now();
     function startHeartbeat() {
+      // Start session first
+      startSession();
+      
       // ilk nabız
       track('heartbeat', { since_ms: 0 });
       // periyodik
       hbTimer = setInterval(function () {
         track('heartbeat', { since_ms: Date.now() - startTs });
+        updateSession(); // Update session on each heartbeat
       }, 10000); // 10 saniye
     }
 
@@ -98,6 +180,8 @@
         clearInterval(hbTimer);
         hbTimer = null;
       }
+      // End session when stopping heartbeat
+      endSession();
     }
 
     // ---- page tracking ------------------------------------------------------
@@ -122,7 +206,10 @@
       startHeartbeat();
       
       // Page unload
-      window.addEventListener('beforeunload', trackPageUnload);
+      window.addEventListener('beforeunload', function() {
+        trackPageUnload();
+        endSession(); // End session on page unload
+      });
       
       HRL.initialized = true;
       console.log('HRL Tracking: Initialized successfully');
@@ -139,7 +226,10 @@
     window.HRL = {
       track: track,
       config: HRL.config,
-      initialized: function() { return HRL.initialized; }
+      initialized: function() { return HRL.initialized; },
+      startSession: startSession,
+      endSession: endSession,
+      updateSession: updateSession
     };
 
   })();

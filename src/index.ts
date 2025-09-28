@@ -28,12 +28,17 @@ dotenv.config();
 // Yardımcı araçları ve servisleri içe aktar
 import { db, redis, createLogger, setupRequestTracking, getHealthStatus } from './tracking/utils';
 import { ActiveUsersManager } from './tracking/active-users';
+import { SessionManager } from './tracking/sessions';
+import { REDIS_KEYS } from './tracking/sessions/constants';
 
 // Sunucu için logger oluştur
 const logger = createLogger('Server');
 
 // Active Users Manager instance
 const activeUsersManager = new ActiveUsersManager();
+
+// Session Manager instance
+const sessionManager = new SessionManager();
 
 /**
  * App konfigürasyonunu getirir (feature flags ile)
@@ -681,27 +686,62 @@ async function registerRoutes() {
                   <p class="stat-label">Active Users</p>
                 </div>
                 <div class="stat-card">
-                  <p class="stat-value" id="pageViews">-</p>
-                  <p class="stat-label">Page Views</p>
+                  <p class="stat-value" id="activeSessions">-</p>
+                  <p class="stat-label">Active Sessions</p>
                 </div>
                 <div class="stat-card">
-                  <p class="stat-value" id="sessions">-</p>
-                  <p class="stat-label">Sessions</p>
+                  <p class="stat-value" id="totalSessions">-</p>
+                  <p class="stat-label">Total Sessions (Today)</p>
                 </div>
                 <div class="stat-card">
-                  <p class="stat-value" id="conversions">-</p>
-                  <p class="stat-label">Conversions</p>
+                  <p class="stat-value" id="avgSessionDuration">-</p>
+                  <p class="stat-label">Avg Session Duration</p>
+                </div>
+                <div class="stat-card">
+                  <p class="stat-value" id="bounceRate">-</p>
+                  <p class="stat-label">Bounce Rate</p>
+                </div>
+                <div class="stat-card">
+                  <p class="stat-value" id="returnVisitors">-</p>
+                  <p class="stat-label">Return Visitors</p>
+                </div>
+              </div>
+
+              <div class="section">
+                <h2 class="section-title">Session Analytics</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                  <div>
+                    <h3 style="font-size: 16px; font-weight: 600; color: #202223; margin: 0 0 12px 0;">Session Distribution</h3>
+                    <div id="sessionDistribution" style="background: #f6f6f7; padding: 16px; border-radius: 6px; min-height: 200px;">
+                      <p style="color: #6d7175; text-align: center; margin: 50px 0;">Loading session distribution...</p>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 style="font-size: 16px; font-weight: 600; color: #202223; margin: 0 0 12px 0;">Top Pages</h3>
+                    <div id="topPages" style="background: #f6f6f7; padding: 16px; border-radius: 6px; min-height: 200px;">
+                      <p style="color: #6d7175; text-align: center; margin: 50px 0;">Loading top pages...</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <div class="section">
                 <h2 class="section-title">Recent Activity</h2>
-                <p style="color: #6d7175;">No recent activity to display.</p>
+                <div id="recentActivity" style="background: #f6f6f7; padding: 16px; border-radius: 6px;">
+                  <p style="color: #6d7175; text-align: center; margin: 20px 0;">Loading recent activity...</p>
+                </div>
               </div>
 
               <div class="section">
                 <h2 class="section-title">Settings</h2>
-                <p style="color: #6d7175;">App settings will be available here.</p>
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                  <button id="refreshData" style="background: #008060; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    Refresh Data
+                  </button>
+                  <button id="clearData" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px;">
+                    Clear All Data
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -726,19 +766,120 @@ async function registerRoutes() {
               // Load dashboard data
               async function loadDashboardData() {
                 try {
+                  // Load active users and sessions
                   const response = await fetch('/api/dashboard/status?shop=${shop}');
                   const data = await response.json();
                   
                   if (data.success) {
                     const metrics = data.data.metrics;
                     document.getElementById('activeUsers').textContent = metrics.active_users || 0;
-                    document.getElementById('sessions').textContent = metrics.active_sessions || 0;
-                    document.getElementById('pageViews').textContent = '0'; // TODO: Implement page views count
-                    document.getElementById('conversions').textContent = '0'; // TODO: Implement conversions count
+                    document.getElementById('activeSessions').textContent = metrics.active_sessions || 0;
                   }
+
+                  // Load session analytics
+                  const analyticsResponse = await fetch('/api/sessions/analytics?shop=${shop}&time_range=today');
+                  const analyticsData = await analyticsResponse.json();
+                  
+                  if (analyticsData.success) {
+                    const analytics = analyticsData.data.analytics;
+                    document.getElementById('totalSessions').textContent = analytics.total_sessions || 0;
+                    document.getElementById('avgSessionDuration').textContent = formatDuration(analytics.avg_session_duration_ms || 0);
+                    document.getElementById('bounceRate').textContent = (analytics.bounce_rate || 0).toFixed(1) + '%';
+                    document.getElementById('returnVisitors').textContent = (analytics.return_visitor_rate || 0).toFixed(1) + '%';
+                  }
+
+                  // Load session distribution
+                  const distributionResponse = await fetch('/api/sessions/distribution?shop=${shop}');
+                  const distributionData = await distributionResponse.json();
+                  
+                  if (distributionData.success) {
+                    displaySessionDistribution(distributionData.data.distribution || []);
+                  }
+
+                  // Load top pages
+                  if (analyticsData.success) {
+                    displayTopPages(analyticsData.data.analytics.top_pages || []);
+                  }
+
+                  // Load recent activity
+                  loadRecentActivity();
+
                 } catch (error) {
                   console.error('Failed to load dashboard data:', error);
                 }
+              }
+
+              // Format duration helper
+              function formatDuration(ms) {
+                if (ms < 1000) return ms + 'ms';
+                const seconds = Math.floor(ms / 1000);
+                if (seconds < 60) return seconds + 's';
+                const minutes = Math.floor(seconds / 60);
+                if (minutes < 60) return minutes + 'm ' + (seconds % 60) + 's';
+                const hours = Math.floor(minutes / 60);
+                return hours + 'h ' + (minutes % 60) + 'm';
+              }
+
+              // Display session distribution
+              function displaySessionDistribution(distribution) {
+                const container = document.getElementById('sessionDistribution');
+                if (distribution.length === 0) {
+                  container.innerHTML = '<p style="color: #6d7175; text-align: center; margin: 50px 0;">No session data available</p>';
+                  return;
+                }
+
+                let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                distribution.forEach(item => {
+                  html += \`
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: white; border-radius: 4px;">
+                      <span style="font-weight: 500;">\${item.bucket} sessions</span>
+                      <span style="color: #6d7175;">\${item.count} visitors (\${item.percentage.toFixed(1)}%)</span>
+                    </div>
+                  \`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+              }
+
+              // Display top pages
+              function displayTopPages(pages) {
+                const container = document.getElementById('topPages');
+                if (pages.length === 0) {
+                  container.innerHTML = '<p style="color: #6d7175; text-align: center; margin: 50px 0;">No page data available</p>';
+                  return;
+                }
+
+                let html = '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                pages.slice(0, 5).forEach(page => {
+                  html += \`
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: white; border-radius: 4px;">
+                      <span style="font-weight: 500; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">\${page.page}</span>
+                      <span style="color: #6d7175;">\${page.session_count} (\${page.percentage.toFixed(1)}%)</span>
+                    </div>
+                  \`;
+                });
+                html += '</div>';
+                container.innerHTML = html;
+              }
+
+              // Load recent activity
+              function loadRecentActivity() {
+                const container = document.getElementById('recentActivity');
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('tr-TR');
+                
+                container.innerHTML = \`
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: white; border-radius: 4px;">
+                      <span>Dashboard data refreshed</span>
+                      <span style="color: #6d7175; font-size: 12px;">\${timeStr}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: white; border-radius: 4px;">
+                      <span>Session analytics loaded</span>
+                      <span style="color: #6d7175; font-size: 12px;">\${timeStr}</span>
+                    </div>
+                  </div>
+                \`;
               }
 
               // Load data on page load
@@ -746,6 +887,29 @@ async function registerRoutes() {
               
               // Refresh data every 30 seconds
               setInterval(loadDashboardData, 30000);
+
+              // Button event listeners
+              document.getElementById('refreshData').addEventListener('click', () => {
+                loadDashboardData();
+              });
+
+              document.getElementById('clearData').addEventListener('click', async () => {
+                if (confirm('Are you sure you want to clear all tracking data? This action cannot be undone.')) {
+                  try {
+                    const response = await fetch('/api/debug/clear-redis?shop=${shop}', { method: 'POST' });
+                    const result = await response.json();
+                    if (result.success) {
+                      alert('Data cleared successfully');
+                      loadDashboardData();
+                    } else {
+                      alert('Failed to clear data');
+                    }
+                  } catch (error) {
+                    console.error('Error clearing data:', error);
+                    alert('Error clearing data');
+                  }
+                }
+              });
             </script>
           </body>
           </html>
@@ -1226,6 +1390,48 @@ async function registerRoutes() {
 
   // Dashboard API routes (keeping only API endpoints, removing duplicate /dashboard route)
   fastify.register(async function (fastify) {
+    // Debug endpoint for clearing Redis data
+    fastify.post('/api/debug/clear-redis', async (request, reply) => {
+      try {
+        const { shop } = request.query as { shop?: string };
+        
+        if (!shop) {
+          return reply.status(400).send({ 
+            success: false, 
+            error: 'Shop parameter is required' 
+          });
+        }
+
+        // Clear all Redis keys for this shop
+        const keys = [
+          `${REDIS_KEYS.PRESENCE_VISITORS}:${shop}`,
+          `${REDIS_KEYS.PRESENCE_SESSIONS}:${shop}`,
+          `${REDIS_KEYS.VISITOR_SESSION_COUNTS}:${shop}`,
+          `${REDIS_KEYS.SESSION_DISTRIBUTION}:${shop}`,
+          `${REDIS_KEYS.CURRENT_SESSION}:${shop}`,
+          `${REDIS_KEYS.SESSION_METADATA}:${shop}`
+        ];
+
+        for (const key of keys) {
+          await redis.getClient().del(key);
+        }
+
+        logger.info('Redis data cleared for shop', { shop, keys });
+
+        return reply.send({
+          success: true,
+          message: 'Redis data cleared successfully',
+          cleared_keys: keys
+        });
+      } catch (error) {
+        logger.error('Error clearing Redis data', { error });
+        return reply.status(500).send({
+          success: false,
+          error: 'Failed to clear Redis data'
+        });
+      }
+    });
+
     // Dashboard API - Uygulama durumu
     fastify.get('/api/dashboard/status', async (request, reply) => {
       try {
@@ -1667,6 +1873,10 @@ async function start() {
     // Start Active Users Manager
     await activeUsersManager.start();
     logger.info('Active Users Manager started');
+
+    // Start Session Manager
+    await sessionManager.start();
+    logger.info('Session Manager started');
 
     // Start server
     const port = parseInt(process.env['PORT'] || '3000');
