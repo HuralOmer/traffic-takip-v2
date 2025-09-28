@@ -117,21 +117,38 @@ export class SessionManager {
           const lastActivity = parseInt(sessionData['last_activity'] as string);
           sessionGap = timestamp - lastActivity;
           
+          // Sadece 15 dakikadan fazla gap varsa yeni session başlat
           if (sessionGap > SESSION_GAP_MS) {
-            // Yeni session başlat
+            // Yeni session başlat (15 dakikadan fazla offline)
             previousSessionId = currentSessionId;
             sessionId = randomUUID();
             isNewSession = true;
+            console.log('SessionManager: Starting new session due to gap', { 
+              sessionGap: sessionGap, 
+              gapMinutes: Math.round(sessionGap / 60000),
+              thresholdMinutes: Math.round(SESSION_GAP_MS / 60000)
+            });
           } else {
-            // Mevcut session'ı güncelle
+            // Mevcut session'ı güncelle (aynı browser session)
             sessionId = currentSessionId as string;
             isNewSession = false;
+            console.log('SessionManager: Updating existing session', { 
+              sessionId, 
+              sessionGap: sessionGap,
+              gapMinutes: Math.round(sessionGap / 60000)
+            });
           }
+        } else {
+          // Session data yok, yeni session başlat
+          sessionId = randomUUID();
+          isNewSession = true;
+          console.log('SessionManager: Starting new session (no session data)');
         }
       } else {
-        // Yeni session başlat
+        // Yeni session başlat (hiç session yok)
         sessionId = randomUUID();
         isNewSession = true;
+        console.log('SessionManager: Starting new session (no current session)');
       }
       
       // Session'ı Redis'e kaydet

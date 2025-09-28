@@ -8,8 +8,9 @@
 // Session TTL (Time To Live) - 30 saniye
 export const SESSION_TTL_MS = 30_000;
 
-// Session Gap - 15 dakika (offline'dan sonra yeni session başlatma süresi)
-export const SESSION_GAP_MS = 15 * 60 * 1000;
+// Session Gap - 30 dakika (offline'dan sonra yeni session başlatma süresi)
+// Bu süre içinde aynı browser'da yeni sekmeler açılırsa yeni session oluşturulmaz
+export const SESSION_GAP_MS = 30 * 60 * 1000;
 
 // Ticker Interval - 10 saniye (session cleanup ve monitoring)
 export const TICKER_INTERVAL_MS = 10_000;
