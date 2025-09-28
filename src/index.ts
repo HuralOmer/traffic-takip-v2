@@ -549,7 +549,18 @@ async function ensureShopExists(shop: string): Promise<void> {
           logger.info('Shop record created successfully', { shop });
         }
       } catch (insertErr) {
-        logger.error('Exception during shop creation', { shop, insertErr });
+        logger.error('Exception during shop creation', { 
+          shop, 
+          insertErr: insertErr instanceof Error ? {
+            message: insertErr.message,
+            stack: insertErr.stack,
+            name: insertErr.name
+          } : {
+            type: typeof insertErr,
+            string: String(insertErr),
+            json: JSON.stringify(insertErr, null, 2)
+          }
+        });
       }
     } else if (existingShop) {
       // Shop zaten var, updated_at'i güncelle
@@ -560,7 +571,18 @@ async function ensureShopExists(shop: string): Promise<void> {
           .update({ updated_at: new Date().toISOString() })
           .eq('shop_domain', shop);
       } catch (updateErr) {
-        logger.error('Exception during shop update', { shop, updateErr });
+        logger.error('Exception during shop update', { 
+          shop, 
+          updateErr: updateErr instanceof Error ? {
+            message: updateErr.message,
+            stack: updateErr.stack,
+            name: updateErr.name
+          } : {
+            type: typeof updateErr,
+            string: String(updateErr),
+            json: JSON.stringify(updateErr, null, 2)
+          }
+        });
       }
     } else if (checkError) {
       // Başka bir hata var
@@ -2475,6 +2497,73 @@ async function start() {
         });
       } catch (error) {
         logger.error('Database debug error', { error });
+        reply.status(500).send({
+          success: false,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    });
+
+    // Debug endpoint - shop oluşturma testi
+    fastify.post('/debug/shop-test', async (request, reply) => {
+      try {
+        const { shop } = request.body as { shop: string };
+        if (!shop) {
+          return reply.status(400).send({ error: 'Shop parameter required' });
+        }
+
+        logger.info('Testing shop creation', { shop });
+        
+        // Test shop oluşturma
+        const testShop = `test-${shop}-${Date.now()}`;
+        
+        const { data: insertData, error: insertError } = await db.getServiceClient()
+          .from('shops')
+          .insert({
+            shop_domain: testShop,
+            access_token: 'test_token',
+            shop_name: 'Test Shop',
+            shop_email: 'test@example.com',
+            shop_currency: 'USD',
+            shop_timezone: 'UTC',
+            installed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select();
+
+        logger.info('Shop creation test result', { insertData, insertError });
+
+        // Test shop'u sil
+        if (insertData) {
+          await db.getServiceClient()
+            .from('shops')
+            .delete()
+            .eq('shop_domain', testShop);
+        }
+
+        reply.send({
+          success: true,
+          testShop,
+          insertData,
+          insertError: insertError ? {
+            message: insertError.message,
+            code: insertError.code,
+            details: insertError.details,
+            hint: insertError.hint
+          } : null
+        });
+      } catch (error) {
+        logger.error('Shop test error', { 
+          error: error instanceof Error ? {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          } : {
+            type: typeof error,
+            string: String(error),
+            json: JSON.stringify(error, null, 2)
+          }
+        });
         reply.status(500).send({
           success: false,
           error: error instanceof Error ? error.message : String(error)
