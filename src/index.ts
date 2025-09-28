@@ -489,10 +489,16 @@ async function registerPlugins() {
 
   // Statik dosya servisi
   // Public klasöründeki dosyaları /public/ prefix'i ile sunar
-  await fastify.register(staticFiles, {
-    root: join(__dirname, '../public'),
-    prefix: '/public/',
-  });
+  // Register static file serving (optional)
+  try {
+    await fastify.register(staticFiles, {
+      root: join(__dirname, '../public'),
+      prefix: '/public/',
+    });
+    logger.info('Static file serving registered');
+  } catch (error) {
+    logger.warn('Static file serving failed, continuing without it', { error });
+  }
 
   // WebSocket desteği
   // Gerçek zamanlı güncellemeler için
