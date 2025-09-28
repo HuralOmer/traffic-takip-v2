@@ -99,6 +99,9 @@ export class SessionManager {
       const sessionMetaKey = `${REDIS_KEYS.SESSION_METADATA}:${shop}:${visitor_id}`;
 
       // Lua script ile atomik session başlatma
+      console.log('SessionManager: Executing Lua script with keys:', [currentSessionKey, presenceSessionsKey, visitorCountsKey, sessionMetaKey]);
+      console.log('SessionManager: Executing Lua script with args:', [visitor_id, timestamp.toString(), SESSION_GAP_MS.toString(), SESSION_TTL_MS.toString(), page_path, referrer, user_agent, ip_hash]);
+      
       const result = await redis.getClient().eval(
         LUA_SCRIPTS.SESSION_START,
         [currentSessionKey, presenceSessionsKey, visitorCountsKey, sessionMetaKey],
@@ -118,6 +121,12 @@ export class SessionManager {
 
       // Lua script'ten dönen result'ı parse et
       const sessionResult = Array.isArray(result) ? result[0] : result;
+      
+      // Result kontrolü
+      if (!sessionResult || !sessionResult.session_id) {
+        console.error('SessionManager: Invalid result from Lua script:', result);
+        throw new Error('Invalid result from Lua script');
+      }
       
       // Eğer yeni session başlatıldıysa Supabase'e kaydet
       if (sessionResult && sessionResult.is_new_session) {
