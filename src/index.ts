@@ -398,8 +398,8 @@ async function processTrackingEvent(shop: string, eventType: string, data: any) 
         break;
         
       case 'session_start':
-        // Session'ı Redis'e kaydet
-        await redis.addPresence(shop, data.visitor_id, data.session_id, data.page_path);
+        // Session tracking artık heartbeat ile yapılıyor
+        // await redis.addPresence(shop, data.visitor_id, data.session_id, data.page_path);
         break;
         
       default:
@@ -978,18 +978,10 @@ async function registerRoutes() {
      * @param {Object} body - Heartbeat verisi (visitor_id, session_id, page_path)
      * @returns {Object} Başarı durumu
      */
-    fastify.post('/presence/beat', async (request, reply) => {
+    fastify.post('/presence/beat', async (_request, reply) => {
       try {
-        const { heartbeatPayloadSchema } = await import('./tracking/utils/validation');
-        const payload = heartbeatPayloadSchema.parse(request.body);
-        
-        // Kullanıcı varlığını Redis'e ekle
-        await redis.addPresence(
-          request.headers['x-shop'] as string,
-          payload.visitor_id,
-          payload.session_id,
-          payload.page_path
-        );
+        // Kullanıcı varlığı artık heartbeat ile yönetiliyor
+        // Bu endpoint artık kullanılmıyor, heartbeat /collect endpoint'inde işleniyor
 
         reply.send({ success: true, message: 'Heartbeat recorded' });
       } catch (error) {
@@ -1334,6 +1326,35 @@ async function registerRoutes() {
       } catch (error) {
         logger.error('Active users retrieval failed', { error });
         reply.status(500).send({ error: 'Active users retrieval failed' });
+      }
+    });
+
+    // Debug endpoint - Redis verilerini temizle
+    fastify.post('/api/debug/clear-redis', async (request, reply) => {
+      try {
+        const { shop } = request.query as { shop?: string };
+        if (!shop) {
+          reply.status(400).send({ error: 'Shop parameter required' });
+          return;
+        }
+
+        // Redis'teki tüm presence verilerini temizle
+        const visitorKey = `presence:v:${shop}`;
+        const sessionKey = `presence:s:${shop}`;
+        
+        await redis.getClient().del(visitorKey);
+        await redis.getClient().del(sessionKey);
+        
+        logger.info('Redis cleared for shop', { shop, visitorKey, sessionKey });
+        
+        reply.send({
+          success: true,
+          message: 'Redis data cleared',
+          cleared_keys: [visitorKey, sessionKey]
+        });
+      } catch (error) {
+        logger.error('Redis clear failed', { error });
+        reply.status(500).send({ error: 'Redis clear failed' });
       }
     });
   });

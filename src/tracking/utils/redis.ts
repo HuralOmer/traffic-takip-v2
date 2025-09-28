@@ -98,13 +98,20 @@ class RedisManager {
     const now = Date.now();
     const ttl = 30000; // 30 seconds
     
-    // Count active users in the last 30 seconds
-    const count = await this.redis.zcount(key, now - ttl, now);
-    
-    // Clean up old entries
-    await this.redis.zremrangebyscore(key, 0, now - ttl);
-    
-    return count;
+    try {
+      // Count active users in the last 30 seconds
+      const count = await this.redis.zcount(key, now - ttl, now);
+      
+      // Clean up old entries
+      await this.redis.zremrangebyscore(key, 0, now - ttl);
+      
+      console.log(`Redis getActiveUsers: shop=${shop}, key=${key}, count=${count}, now=${now}, ttl=${ttl}`);
+      
+      return count;
+    } catch (error) {
+      console.error('Redis getActiveUsers error:', error);
+      return 0;
+    }
   }
 
   public async getActiveSessions(shop: string): Promise<number> {
