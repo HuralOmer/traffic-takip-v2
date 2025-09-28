@@ -2083,7 +2083,8 @@ async function start() {
     currentSession: null,
     sessionStartTime: null,
     heartbeatTimer: null,
-    startTime: Date.now()
+    startTime: Date.now(),
+    isFirstVisit: !localStorage.getItem('hrl_has_visited')
   };
 
   // ---- API Functions --------------------------------------------------------
@@ -2135,7 +2136,24 @@ async function start() {
 
   // ---- Session Management ---------------------------------------------------
   function startSession() {
+    // Sadece ilk ziyarette veya mevcut session yoksa yeni session başlat
     if (HRL.currentSession) return Promise.resolve();
+    
+    // Session gap kontrolü - localStorage'dan son session zamanını al
+    const lastSessionTime = localStorage.getItem('hrl_last_session_time');
+    const now = Date.now();
+    const sessionGap = lastSessionTime ? now - parseInt(lastSessionTime) : Infinity;
+    const SESSION_GAP_MS = 15 * 60 * 1000; // 15 dakika
+    
+    // Eğer session gap 15 dakikadan azsa, yeni session başlatma
+    if (lastSessionTime && sessionGap < SESSION_GAP_MS) {
+      console.log('HRL Tracking: Session gap too small, not starting new session', {
+        sessionGap: sessionGap,
+        gapMinutes: Math.round(sessionGap / 60000),
+        thresholdMinutes: 15
+      });
+      return Promise.resolve();
+    }
     
     HRL.sessionStartTime = Date.now();
     const sessionData = {
@@ -2153,6 +2171,8 @@ async function start() {
       .then(data => {
         if (data.success) {
           HRL.currentSession = data.session_id;
+          // Son session zamanını kaydet
+          localStorage.setItem('hrl_last_session_time', now.toString());
           console.log('HRL Tracking: Session started', data);
         }
         return data;
@@ -2220,8 +2240,13 @@ async function start() {
 
   // ---- Heartbeat Management ------------------------------------------------
   function startHeartbeat() {
-    // Start session first
-    startSession();
+    // Sadece ilk ziyarette session başlat
+    if (HRL.isFirstVisit) {
+      startSession();
+      // İlk ziyaret işaretini kaydet
+      localStorage.setItem('hrl_has_visited', 'true');
+      HRL.isFirstVisit = false;
+    }
     
     // First heartbeat
     track('heartbeat', { since_ms: 0 });
@@ -2229,7 +2254,10 @@ async function start() {
     // Periodic heartbeat
     HRL.heartbeatTimer = setInterval(() => {
       track('heartbeat', { since_ms: Date.now() - HRL.startTime });
-      updateSession(); // Update session on each heartbeat
+      // Session varsa güncelle, yoksa sadece heartbeat gönder
+      if (HRL.currentSession) {
+        updateSession();
+      }
     }, HRL.config.heartbeatInterval);
   }
 
@@ -2249,17 +2277,21 @@ async function start() {
     console.log('HRL Tracking: Initializing...');
     console.log('HRL Tracking: Shop:', HRL.config.shop);
     console.log('HRL Tracking: API URL:', HRL.config.apiUrl);
+    console.log('HRL Tracking: Is first visit:', HRL.isFirstVisit);
     
-    // Page view
+    // Her sayfa yüklendiğinde page view tracking yap
     trackPageView();
     
-    // Heartbeat
+    // Heartbeat (session kontrolü ile birlikte)
     startHeartbeat();
     
     // Page unload
     window.addEventListener('beforeunload', () => {
       trackPageUnload();
-      endSession(); // End session on page unload
+      // Sadece session varsa sonlandır
+      if (HRL.currentSession) {
+        endSession();
+      }
     });
     
     // Visibility change (tab switch)
@@ -2268,7 +2300,10 @@ async function start() {
         console.log('HRL Tracking: Page hidden');
       } else {
         console.log('HRL Tracking: Page visible');
-        updateSession();
+        // Sadece session varsa güncelle
+        if (HRL.currentSession) {
+          updateSession();
+        }
       }
     });
     
