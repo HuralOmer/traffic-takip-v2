@@ -29,7 +29,6 @@ dotenv.config();
 import { db, redis, createLogger, setupRequestTracking, getHealthStatus } from './tracking/utils';
 import { ActiveUsersManager } from './tracking/active-users';
 import { SessionManager } from './tracking/sessions';
-import { REDIS_KEYS } from './tracking/sessions/constants';
 
 // Sunucu için logger oluştur
 const logger = createLogger('Server');
@@ -1408,32 +1407,47 @@ async function registerRoutes() {
           });
         }
 
-        // Clear all Redis keys for this shop
-        const keys = [
-          `${REDIS_KEYS.PRESENCE_VISITORS}:${shop}`,
-          `${REDIS_KEYS.PRESENCE_SESSIONS}:${shop}`,
-          `${REDIS_KEYS.VISITOR_SESSION_COUNTS}:${shop}`,
-          `${REDIS_KEYS.SESSION_DISTRIBUTION}:${shop}`,
-          `${REDIS_KEYS.CURRENT_SESSION}:${shop}`,
-          `${REDIS_KEYS.SESSION_METADATA}:${shop}`
+        logger.info('Starting Redis cleanup for shop', { shop });
+
+        // Clear all Redis keys for this shop - use simple pattern matching
+        const patterns = [
+          `presence:v:${shop}`,
+          `presence:s:${shop}`,
+          `vis:session-count:${shop}`,
+          `hist:sessions:${shop}`,
+          `visitor:current_session:${shop}`,
+          `session:meta:${shop}`,
+          `session_*${shop}*` // Catch any old session keys
         ];
 
-        for (const key of keys) {
-          await redis.getClient().del(key);
+        let clearedCount = 0;
+        for (const pattern of patterns) {
+          try {
+            // Use SCAN to find keys matching pattern
+            const keys = await redis.getClient().keys(pattern);
+            if (keys && keys.length > 0) {
+              await redis.getClient().del(...keys);
+              clearedCount += keys.length;
+              logger.info('Cleared keys for pattern', { pattern, count: keys.length, keys });
+            }
+          } catch (patternError) {
+            logger.warn('Error clearing pattern', { pattern, error: patternError });
+          }
         }
 
-        logger.info('Redis data cleared for shop', { shop, keys });
+        logger.info('Redis cleanup completed', { shop, clearedCount });
 
         return reply.send({
           success: true,
           message: 'Redis data cleared successfully',
-          cleared_keys: keys
+          cleared_count: clearedCount
         });
       } catch (error) {
         logger.error('Error clearing Redis data', { error });
         return reply.status(500).send({
           success: false,
-          error: 'Failed to clear Redis data'
+          error: 'Failed to clear Redis data',
+          details: error instanceof Error ? error.message : String(error)
         });
       }
     });
