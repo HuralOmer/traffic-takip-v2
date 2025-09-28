@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HRL Tracking Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        #console-output {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 HRL Tracking Test Sayfası</h1>
+        
+        <div id="status" class="status info">
+            Script yükleniyor...
+        </div>
+        
+        <h3>Test Butonları:</h3>
+        <button onclick="testTracking()">Test Tracking</button>
+        <button onclick="testSession()">Test Session</button>
+        <button onclick="clearConsole()">Console Temizle</button>
+        
+        <h3>Console Çıktısı:</h3>
+        <div id="console-output"></div>
+        
+        <h3>HRL Object:</h3>
+        <div id="hrl-info"></div>
+    </div>
+
+    <!-- HRL Universal Tracking Script -->
+    <script src="https://traffic-takip-production.up.railway.app/public/universal-tracking.js" 
+            onload="console.log('Script loaded successfully')" 
+            onerror="console.error('Script failed to load')"></script>
+    
+    <!-- Fallback: Inline Script -->
+    <script>
+        // Fallback script if external fails
+        if (!window.HRL) {
+            console.log('External script failed, loading inline fallback...');
+            
+            // Simple HRL object for testing
+            window.HRL = {
+                config: {
+                    shop: window.location.hostname,
+                    apiUrl: 'https://traffic-takip-production.up.railway.app'
+                },
+                initialized: () => true,
+                track: (type, data) => {
+                    console.log('HRL Tracking (Fallback):', type, data);
+                    return fetch('https://traffic-takip-production.up.railway.app/app-proxy/collect', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            type: type,
+                            shop: window.location.hostname,
+                            timestamp: Date.now(),
+                            ...data
+                        })
+                    }).catch(err => console.warn('HRL Tracking (Fallback) error:', err));
+                },
+                startSession: () => console.log('HRL Tracking (Fallback): Session started'),
+                endSession: () => console.log('HRL Tracking (Fallback): Session ended'),
+                updateSession: () => console.log('HRL Tracking (Fallback): Session updated'),
+                setShop: (shop) => { window.HRL.config.shop = shop; },
+                setApiUrl: (url) => { window.HRL.config.apiUrl = url; }
+            };
+            
+            console.log('HRL Tracking (Fallback): Initialized successfully');
+        }
+    </script>
+    
+    <script>
+        // Console çıktısını yakala
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        
+        function addToConsoleOutput(message, type = 'log') {
+            const output = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            const prefix = type === 'error' ? '❌' : type === 'warn' ? '⚠️' : '✅';
+            output.textContent += `[${timestamp}] ${prefix} ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            addToConsoleOutput(args.join(' '), 'log');
+        };
+        
+        console.warn = function(...args) {
+            originalWarn.apply(console, args);
+            addToConsoleOutput(args.join(' '), 'warn');
+        };
+        
+        console.error = function(...args) {
+            originalError.apply(console, args);
+            addToConsoleOutput(args.join(' '), 'error');
+        };
+        
+        // Sayfa yüklendiğinde kontrol et
+        window.addEventListener('load', function() {
+            const status = document.getElementById('status');
+            const hrlInfo = document.getElementById('hrl-info');
+            
+            setTimeout(() => {
+                if (window.HRL) {
+                    status.className = 'status success';
+                    status.textContent = '✅ HRL Tracking başarıyla yüklendi!';
+                    
+                    hrlInfo.innerHTML = `
+                        <p><strong>HRL Object:</strong> ${typeof window.HRL}</p>
+                        <p><strong>Initialized:</strong> ${window.HRL.initialized()}</p>
+                        <p><strong>Shop:</strong> ${window.HRL.config.shop}</p>
+                        <p><strong>API URL:</strong> ${window.HRL.config.apiUrl}</p>
+                        <p><strong>Visitor ID:</strong> ${window.HRL.config.visitorId || 'N/A'}</p>
+                        <p><strong>Session ID:</strong> ${window.HRL.config.sessionId || 'N/A'}</p>
+                    `;
+                } else {
+                    status.className = 'status error';
+                    status.textContent = '❌ HRL Tracking yüklenemedi!';
+                }
+            }, 2000);
+        });
+        
+        // Test fonksiyonları
+        function testTracking() {
+            if (window.HRL) {
+                window.HRL.track('test_event', { test: 'data' });
+                addToConsoleOutput('Test event gönderildi', 'log');
+            } else {
+                addToConsoleOutput('HRL object bulunamadı!', 'error');
+            }
+        }
+        
+        function testSession() {
+            if (window.HRL) {
+                window.HRL.startSession();
+                addToConsoleOutput('Session başlatıldı', 'log');
+            } else {
+                addToConsoleOutput('HRL object bulunamadı!', 'error');
+            }
+        }
+        
+        function clearConsole() {
+            document.getElementById('console-output').textContent = '';
+        }
+        
+        // Network hatalarını yakala
+        window.addEventListener('error', function(e) {
+            if (e.filename && e.filename.includes('universal-tracking.js')) {
+                addToConsoleOutput(`Script yükleme hatası: ${e.message}`, 'error');
+            }
+        });
+    </script>
+</body>
+</html>

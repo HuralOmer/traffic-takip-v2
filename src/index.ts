@@ -469,9 +469,10 @@ async function registerPlugins() {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https:"],
         imgSrc: ["'self'", "data:", "https:"],
         connectSrc: ["'self'", "wss:", "https:"],
+        frameSrc: ["'self'", "https:"],
       },
     },
   });
@@ -2102,10 +2103,14 @@ async function start() {
           .header('Cache-Control', 'public, max-age=300')
           .header('Access-Control-Allow-Origin', '*')
           .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-          .header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With')
+          .header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With, Accept, Origin')
           .header('Access-Control-Allow-Credentials', 'false')
+          .header('Access-Control-Expose-Headers', 'Content-Length, X-Request-Id')
           .header('X-Content-Type-Options', 'nosniff')
           .header('X-Frame-Options', 'ALLOWALL')
+          .header('Cross-Origin-Embedder-Policy', 'unsafe-none')
+          .header('Cross-Origin-Opener-Policy', 'unsafe-none')
+          .header('Cross-Origin-Resource-Policy', 'cross-origin')
           .send(scriptContent);
       } catch (error) {
         logger.error('Failed to serve universal tracking script', { error });
@@ -2130,10 +2135,14 @@ async function start() {
       reply
         .header('Access-Control-Allow-Origin', '*')
         .header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        .header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With')
+        .header('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With, Accept, Origin')
         .header('Access-Control-Allow-Credentials', 'false')
+        .header('Access-Control-Expose-Headers', 'Content-Length, X-Request-Id')
         .header('X-Content-Type-Options', 'nosniff')
         .header('X-Frame-Options', 'ALLOWALL')
+        .header('Cross-Origin-Embedder-Policy', 'unsafe-none')
+        .header('Cross-Origin-Opener-Policy', 'unsafe-none')
+        .header('Cross-Origin-Resource-Policy', 'cross-origin')
         .send();
     });
 
