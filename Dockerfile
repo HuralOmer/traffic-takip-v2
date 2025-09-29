@@ -22,3 +22,6 @@ EXPOSE 3000
 
 # Start application
 CMD ["npm", "start"]
+
+# Cache buster
+RUN echo "Build completed at $(date)"
