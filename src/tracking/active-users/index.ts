@@ -308,8 +308,14 @@ export class ActiveUsersManager {
    */
   private async getActiveShops(): Promise<string[]> {
     try {
+      const client = redis.getClient();
+      if (!client) {
+        // Redis not available, return empty array
+        return [];
+      }
+      
       const pattern = `${REDIS_KEYS.PRESENCE_VISITORS}:*`;
-      const keys = await redis.getClient().keys(pattern);
+      const keys = await client.keys(pattern);
       
       return keys.map((key: string) => key.replace(`${REDIS_KEYS.PRESENCE_VISITORS}:`, ''));
     } catch (error) {

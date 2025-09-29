@@ -63,12 +63,17 @@ export class PresenceTracker {
 
     console.log('PresenceTracker: Adding to Redis', { key, member, score: timestamp });
 
-    await redis.getClient().zadd(key, timestamp, member);
+    const client = redis.getClient();
+    if (!client) {
+      throw new Error('Redis client is not available');
+    }
+
+    await client.zadd(key, timestamp, member);
     
     console.log('PresenceTracker: Successfully added to Redis');
     
     // TTL ayarla
-    await redis.getClient().expire(key, Math.ceil(TTL_MS / 1000));
+    await client.expire(key, Math.ceil(TTL_MS / 1000));
 
     // Dashboard'a real-time update gönder
     await this.publishPresenceUpdate(shop, {
@@ -103,10 +108,15 @@ export class PresenceTracker {
       ip_hash,
     } as RedisPresenceData);
 
-    await redis.getClient().zadd(key, timestamp, member);
+    const client = redis.getClient();
+    if (!client) {
+      throw new Error('Redis client is not available');
+    }
+
+    await client.zadd(key, timestamp, member);
     
     // TTL ayarla
-    await redis.getClient().expire(key, Math.ceil(TTL_MS / 1000));
+    await client.expire(key, Math.ceil(TTL_MS / 1000));
 
     // Dashboard'a real-time update gönder
     await this.publishPresenceUpdate(shop, {
@@ -130,7 +140,13 @@ export class PresenceTracker {
     const cutoff = now - timeWindow;
 
     try {
-      const count = await redis.getClient().zcount(key, cutoff, '+inf');
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return 0;
+      }
+      
+      const count = await client.zcount(key, cutoff, '+inf');
       return count || 0;
     } catch (error) {
       console.error('Error getting active visitor count:', error);
@@ -150,7 +166,13 @@ export class PresenceTracker {
     const cutoff = now - timeWindow;
 
     try {
-      const count = await redis.getClient().zcount(key, cutoff, '+inf');
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return 0;
+      }
+      
+      const count = await client.zcount(key, cutoff, '+inf');
       return count || 0;
     } catch (error) {
       console.error('Error getting active session count:', error);
@@ -184,8 +206,14 @@ export class PresenceTracker {
     const key = `${REDIS_KEYS.PRESENCE_VISITORS}:${shop}`;
     
     try {
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return;
+      }
+
       // Visitor'ın tüm presence kayıtlarını sil
-      const members = await redis.getClient().zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
+      const members = await client.zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
       
       for (let i = 0; i < members.length; i += 2) {
         const member = members[i] as string;
@@ -201,14 +229,14 @@ export class PresenceTracker {
           }
           
           if (data.visitor_id === visitor_id) {
-            await redis.getClient().zrem(key, member);
+            await client.zrem(key, member);
           }
         } catch (parseError) {
           console.warn('Error parsing member for removal:', parseError, 'Member:', member);
           // Parse edilemeyen member'ı da sil
           try {
             if (member) {
-              await redis.getClient().zrem(key, member);
+              await client.zrem(key, member);
             }
           } catch (removalError) {
             console.warn('Error removing invalid member:', removalError);
@@ -237,8 +265,14 @@ export class PresenceTracker {
     const key = `${REDIS_KEYS.PRESENCE_SESSIONS}:${shop}`;
     
     try {
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return;
+      }
+
       // Session'ın tüm presence kayıtlarını sil
-      const members = await redis.getClient().zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
+      const members = await client.zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
       
       for (let i = 0; i < members.length; i += 2) {
         const member = members[i] as string;
@@ -254,14 +288,14 @@ export class PresenceTracker {
           }
           
           if (data.session_id === session_id) {
-            await redis.getClient().zrem(key, member);
+            await client.zrem(key, member);
           }
         } catch (parseError) {
           console.warn('Error parsing member for removal:', parseError, 'Member:', member);
           // Parse edilemeyen member'ı da sil
           try {
             if (member) {
-              await redis.getClient().zrem(key, member);
+              await client.zrem(key, member);
             }
           } catch (removalError) {
             console.warn('Error removing invalid member:', removalError);
@@ -310,11 +344,17 @@ export class PresenceTracker {
     const sessionKey = `${REDIS_KEYS.PRESENCE_SESSIONS}:${shop}`;
 
     try {
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return;
+      }
+
       // Eski visitor kayıtlarını sil
-      await redis.getClient().zremrangebyscore(visitorKey, '-inf', cutoff);
+      await client.zremrangebyscore(visitorKey, '-inf', cutoff);
       
       // Eski session kayıtlarını sil
-      await redis.getClient().zremrangebyscore(sessionKey, '-inf', cutoff);
+      await client.zremrangebyscore(sessionKey, '-inf', cutoff);
     } catch (error) {
       console.error(`Error cleaning up presence for shop ${shop}:`, error);
     }
@@ -326,8 +366,14 @@ export class PresenceTracker {
    */
   private async getActiveShops(): Promise<string[]> {
     try {
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return [];
+      }
+
       const pattern = `${REDIS_KEYS.PRESENCE_VISITORS}:*`;
-      const keys = await redis.getClient().keys(pattern);
+      const keys = await client.keys(pattern);
       
       return keys.map((key: string) => key.replace(`${REDIS_KEYS.PRESENCE_VISITORS}:`, ''));
     } catch (error) {
@@ -374,7 +420,13 @@ export class PresenceTracker {
     const key = `${REDIS_KEYS.PRESENCE_VISITORS}:${shop}`;
     
     try {
-      return await redis.getClient().zcard(key);
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return 0;
+      }
+      
+      return await client.zcard(key);
     } catch (error) {
       console.error('Error getting total visitor count:', error);
       return 0;
@@ -390,7 +442,13 @@ export class PresenceTracker {
     const key = `${REDIS_KEYS.PRESENCE_SESSIONS}:${shop}`;
     
     try {
-      return await redis.getClient().zcard(key);
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return 0;
+      }
+      
+      return await client.zcard(key);
     } catch (error) {
       console.error('Error getting total session count:', error);
       return 0;
@@ -406,7 +464,13 @@ export class PresenceTracker {
     const key = `${REDIS_KEYS.PRESENCE_VISITORS}:${shop}`;
     
     try {
-      const members = await redis.getClient().zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return 0;
+      }
+      
+      const members = await client.zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
       if (members.length >= 2) {
         // En son elemanı al (en yüksek score'a sahip)
         const lastScore = parseFloat(members[members.length - 1] as string);
@@ -426,7 +490,13 @@ export class PresenceTracker {
    */
   private async removeVisitorEntries(key: string, visitor_id: string): Promise<void> {
     try {
-      const members = await redis.getClient().zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return;
+      }
+      
+      const members = await client.zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
       
       for (let i = 0; i < members.length; i += 2) {
         const member = members[i];
@@ -448,7 +518,7 @@ export class PresenceTracker {
           
           if (data.visitor_id === visitor_id) {
             if (member) {
-              await redis.getClient().zrem(key, member);
+              await client.zrem(key, member);
               console.log('PresenceTracker: Removed old visitor entry', { visitor_id, member });
             }
           }
@@ -457,7 +527,7 @@ export class PresenceTracker {
           // Parse edilemeyen member'ı da sil
           try {
             if (member) {
-              await redis.getClient().zrem(key, member);
+              await client.zrem(key, member);
             }
           } catch (removalError) {
             console.warn('Error removing invalid member:', removalError);
@@ -476,7 +546,13 @@ export class PresenceTracker {
    */
   private async removeSessionEntries(key: string, session_id: string): Promise<void> {
     try {
-      const members = await redis.getClient().zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
+      const client = redis.getClient();
+      if (!client) {
+        console.warn('Redis client is not available');
+        return;
+      }
+      
+      const members = await client.zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
       
       for (let i = 0; i < members.length; i += 2) {
         const member = members[i];
@@ -485,7 +561,7 @@ export class PresenceTracker {
           // UUID formatını kontrol et (UUID'ler direkt string olarak saklanıyor)
           if (typeof member === 'string' && member === session_id) {
             // UUID ise direkt sil
-            await redis.getClient().zrem(key, member);
+            await client.zrem(key, member);
             console.log('PresenceTracker: Removed old session entry', { session_id, member });
             continue;
           }
@@ -511,7 +587,7 @@ export class PresenceTracker {
           
           if (data.session_id === session_id) {
             if (member) {
-              await redis.getClient().zrem(key, member);
+              await client.zrem(key, member);
               console.log('PresenceTracker: Removed old session entry', { session_id, member });
             }
           }
@@ -520,7 +596,7 @@ export class PresenceTracker {
           // Parse edilemeyen member'ı da sil
           try {
             if (member) {
-              await redis.getClient().zrem(key, member);
+              await client.zrem(key, member);
             }
           } catch (removalError) {
             console.warn('Error removing invalid member:', removalError);
