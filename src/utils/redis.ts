@@ -22,15 +22,23 @@ class RedisManager {
    */
   private initializeClient(): void {
     try {
-      const redisUrl = process.env['REDIS_URL'] || 'redis://localhost:6379';
+      // Only initialize Redis if REDIS_URL is explicitly set
+      if (!process.env['REDIS_URL']) {
+        logger.info('Redis URL not provided, Redis client will not be initialized');
+        return;
+      }
+
+      const redisUrl = process.env['REDIS_URL'];
       
       this.client = new Redis(redisUrl, {
-        maxRetriesPerRequest: 3,
+        maxRetriesPerRequest: 0, // Disable retries
         lazyConnect: true,
         keepAlive: 30000,
-        connectTimeout: 10000,
-        commandTimeout: 5000,
-        enableOfflineQueue: false
+        connectTimeout: 3000,
+        commandTimeout: 2000,
+        enableOfflineQueue: false,
+        retryDelayOnFailover: 100,
+        retryDelayOnClusterDown: 100
       });
 
       // Event listeners
@@ -67,10 +75,7 @@ class RedisManager {
   /**
    * Get Redis client
    */
-  public getClient(): Redis {
-    if (!this.client) {
-      throw new Error('Redis client not initialized');
-    }
+  public getClient(): Redis | null {
     return this.client;
   }
 

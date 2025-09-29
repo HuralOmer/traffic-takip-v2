@@ -181,7 +181,13 @@ export class ActiveUsersManager {
     const key = `${REDIS_KEYS.EMA_STATE}:${shop}`;
     
     try {
-      const data = await redis.getClient().hgetall(key);
+      const client = redis.getClient();
+      if (!client) {
+        // Redis not available, return initial state
+        return createInitialEMAState(0, Date.now());
+      }
+      
+      const data = await client.hgetall(key);
       
       if (!data || Object.keys(data).length === 0) {
         // İlk kez, sıfır state oluştur
@@ -220,7 +226,13 @@ export class ActiveUsersManager {
     const key = `${REDIS_KEYS.EMA_STATE}:${shop}`;
     
     try {
-      await redis.getClient().hset(key, {
+      const client = redis.getClient();
+      if (!client) {
+        // Redis not available, skip
+        return;
+      }
+      
+      await client.hset(key, {
         ema_fast: emaState.ema_fast.toString(),
         ema_slow: emaState.ema_slow.toString(),
         last_ts: emaState.last_ts.toString(),
@@ -228,7 +240,7 @@ export class ActiveUsersManager {
       });
       
       // TTL ayarla
-      await redis.getClient().expire(key, Math.ceil(TTL_MS / 1000));
+      await client.expire(key, Math.ceil(TTL_MS / 1000));
     } catch (error) {
       console.error('Error setting EMA state:', error);
     }
