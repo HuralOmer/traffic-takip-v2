@@ -38,15 +38,13 @@ export interface ServerConfig {
 export class Server {
   private fastify: FastifyInstance;
   private config: ServerConfig;
-  private dbManager: DatabaseManager | null;
   private activeUsersManager: ActiveUsersManager | null;
 
   constructor(
-    dbManager: DatabaseManager | null, 
+    _dbManager: DatabaseManager | null, 
     activeUsersManager: ActiveUsersManager | null,
     config?: Partial<ServerConfig>
   ) {
-    this.dbManager = dbManager;
     this.activeUsersManager = activeUsersManager;
     
     // Default configuration
