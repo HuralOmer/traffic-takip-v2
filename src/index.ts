@@ -26,7 +26,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Yardımcı araçları ve servisleri içe aktar
-import { db, redis, createLogger, setupRequestTracking, getHealthStatus } from './tracking/utils';
+import { db, redis, createLogger, setupRequestTracking, getHealthStatus, hashIP } from './tracking/utils';
 import { ActiveUsersManager } from './tracking/active-users';
 import { SessionManager } from './tracking/sessions';
 
@@ -1832,7 +1832,7 @@ async function registerRoutes() {
     // Session başlatma endpoint'i
     fastify.post('/api/sessions/start', async (request, reply) => {
       try {
-        const { shop, visitor_id, page_path, referrer, user_agent, ip_hash } = request.body as any;
+        const { shop, visitor_id, page_path, referrer, user_agent } = request.body as any;
         
         if (!shop || !visitor_id || !page_path) {
           reply.status(400).send({ 
@@ -1842,15 +1842,25 @@ async function registerRoutes() {
           return;
         }
 
-        // Global sessionManager instance'ını kullan
+        // IP adresini hash'le
+        const ip = request.ip;
+        const ipHash = hashIP(ip);
+        
+        logger.info('Session start request', { 
+          shop, 
+          visitor_id, 
+          ip: ip.substring(0, 8) + '...', // IP'nin ilk 8 karakterini logla
+          ipHash: ipHash.substring(0, 8) + '...' // Hash'in ilk 8 karakterini logla
+        });
 
+        // Global sessionManager instance'ını kullan
         const result = await sessionManager.startSession({
           shop,
           visitor_id,
           page_path,
           referrer,
           user_agent,
-          ip_hash
+          ip_hash: ipHash
         });
 
         reply.send(result);
