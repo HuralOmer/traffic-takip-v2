@@ -195,7 +195,7 @@ export class RedisAdapter implements CacheDatabaseAdapter {
     }
   }
 
-  async checkRateLimit(key: string, limit: number, window: number): Promise<boolean> {
+  async checkRateLimit(key: string, limit: number, _window: number): Promise<boolean> {
     if (!this.client) {
       throw new Error('Redis not connected');
     }
@@ -224,7 +224,7 @@ export class RedisAdapter implements CacheDatabaseAdapter {
         throw new Error('Rate limit increment failed');
       }
       
-      return results[0] as number;
+      return results[0] as unknown as number;
     } catch (error) {
       throw new Error(`Failed to increment rate limit: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
@@ -253,7 +253,7 @@ export class RedisAdapter implements CacheDatabaseAdapter {
       const subscriber = this.client.duplicate();
       await subscriber.connect();
       
-      await subscriber.subscribe(channel, (message: string, channel: string) => {
+      await subscriber.subscribe(channel, (message: string, _channel: string) => {
         try {
           // Try to parse as JSON, fallback to string
           let parsedMessage;
