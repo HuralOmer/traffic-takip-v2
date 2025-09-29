@@ -485,6 +485,12 @@ function analyzeReferrer(referrer: string, userAgent: string): {
  */
 async function ensureShopExists(shop: string): Promise<void> {
   try {
+    // Shop parametresini kontrol et
+    if (!shop || typeof shop !== 'string') {
+      logger.error('Invalid shop parameter', { shop, type: typeof shop });
+      return;
+    }
+    
     logger.info('Checking if shop exists', { shop });
     
     // Önce basit bir test yapalım
@@ -522,12 +528,19 @@ async function ensureShopExists(shop: string): Promise<void> {
       logger.info('Creating shop record for universal tracking', { shop });
       
       try {
+        // Shop name'i güvenli şekilde oluştur
+        const shopName = shop
+          .replace('.myshopify.com', '')
+          .replace('.com', '')
+          .replace(/[^a-zA-Z0-9\-_]/g, '_') // Güvenli karakterler
+          .substring(0, 50); // Maksimum uzunluk
+        
         const { error: insertError } = await db.getServiceClient()
           .from('shops')
           .insert({
             shop_domain: shop,
             access_token: 'universal_tracking', // Universal tracking için özel token
-            shop_name: shop.replace('.myshopify.com', '').replace('.com', ''),
+            shop_name: shopName,
             shop_email: '',
             shop_currency: 'USD',
             shop_timezone: 'UTC',
@@ -1576,16 +1589,30 @@ async function registerRoutes() {
       try {
         const { type, shop, ...data } = request.body as any;
         
-        if (!shop) {
-          return reply.status(400).send({ error: 'Shop parameter required' });
+        if (!shop || typeof shop !== 'string') {
+          logger.error('Invalid shop parameter in /collect', { 
+            shop, 
+            type: typeof shop,
+            body: request.body 
+          });
+          return reply.status(400).send({ error: 'Valid shop parameter required' });
         }
+
+        logger.info('Processing tracking event', { shop, type, hasData: !!data });
 
         // Event'i işle
         await processTrackingEvent(shop, type, data);
         
         reply.send({ success: true, message: 'Event recorded' });
       } catch (error) {
-        logger.error('Event collection failed', { error });
+        logger.error('Event collection failed', { 
+          error: error instanceof Error ? {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          } : error,
+          body: request.body
+        });
         reply.status(400).send({ error: 'Invalid event data' });
       }
     });
