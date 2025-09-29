@@ -73,7 +73,7 @@ export {
 } from './constants';
 
 // Main Active Users Manager Class
-import { redis } from '../../utils/redis';
+import { redis } from '../utils/redis';
 import { PresenceTracker } from './presence';
 import { HeartbeatManager } from './heartbeat';
 import { 

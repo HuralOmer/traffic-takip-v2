@@ -6,7 +6,7 @@
  * ZCOUNT ile aktif kullanıcı sayımı ve ZREMRANGEBYSCORE ile cleanup işlemleri.
  */
 
-import { redis } from '../../utils/redis';
+import { redis } from '../utils/redis';
 import { PresenceData, RedisPresenceData } from './types';
 import { REDIS_KEYS, TTL_MS, PRESENCE_CLEANUP_INTERVAL_MS } from './constants';
 
@@ -63,7 +63,7 @@ export class PresenceTracker {
 
     console.log('PresenceTracker: Adding to Redis', { key, member, score: timestamp });
 
-    await redis.getClient().zadd(key, timestamp, member);
+    await redis.getClient().zadd(key, { score: timestamp, member });
     
     console.log('PresenceTracker: Successfully added to Redis');
     
@@ -103,7 +103,7 @@ export class PresenceTracker {
       ip_hash,
     } as RedisPresenceData);
 
-    await redis.getClient().zadd(key, timestamp, member);
+    await redis.getClient().zadd(key, { score: timestamp, member });
     
     // TTL ayarla
     await redis.getClient().expire(key, Math.ceil(TTL_MS / 1000));
@@ -185,7 +185,7 @@ export class PresenceTracker {
     
     try {
       // Visitor'ın tüm presence kayıtlarını sil
-      const members = await redis.getClient().zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
+      const members = await redis.getClient().zrange(key, '-inf', '+inf', { byScore: true, withScores: true });
       
       for (let i = 0; i < members.length; i += 2) {
         const member = members[i] as string;
@@ -207,9 +207,7 @@ export class PresenceTracker {
           console.warn('Error parsing member for removal:', parseError, 'Member:', member);
           // Parse edilemeyen member'ı da sil
           try {
-            if (member) {
-              await redis.getClient().zrem(key, member);
-            }
+            await redis.getClient().zrem(key, member);
           } catch (removalError) {
             console.warn('Error removing invalid member:', removalError);
           }
@@ -238,7 +236,7 @@ export class PresenceTracker {
     
     try {
       // Session'ın tüm presence kayıtlarını sil
-      const members = await redis.getClient().zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
+      const members = await redis.getClient().zrange(key, '-inf', '+inf', { byScore: true, withScores: true });
       
       for (let i = 0; i < members.length; i += 2) {
         const member = members[i] as string;
@@ -260,9 +258,7 @@ export class PresenceTracker {
           console.warn('Error parsing member for removal:', parseError, 'Member:', member);
           // Parse edilemeyen member'ı da sil
           try {
-            if (member) {
-              await redis.getClient().zrem(key, member);
-            }
+            await redis.getClient().zrem(key, member);
           } catch (removalError) {
             console.warn('Error removing invalid member:', removalError);
           }
@@ -311,10 +307,10 @@ export class PresenceTracker {
 
     try {
       // Eski visitor kayıtlarını sil
-      await redis.getClient().zremrangebyscore(visitorKey, '-inf', cutoff);
+      await (redis.getClient().zremrangebyscore as any)(visitorKey, '-inf', cutoff);
       
       // Eski session kayıtlarını sil
-      await redis.getClient().zremrangebyscore(sessionKey, '-inf', cutoff);
+      await (redis.getClient().zremrangebyscore as any)(sessionKey, '-inf', cutoff);
     } catch (error) {
       console.error(`Error cleaning up presence for shop ${shop}:`, error);
     }
@@ -406,10 +402,10 @@ export class PresenceTracker {
     const key = `${REDIS_KEYS.PRESENCE_VISITORS}:${shop}`;
     
     try {
-      const members = await redis.getClient().zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
+      const members = await redis.getClient().zrange(key, '-inf', '+inf', { byScore: true, withScores: true });
       if (members.length >= 2) {
         // En son elemanı al (en yüksek score'a sahip)
-        const lastScore = parseFloat(members[members.length - 1] as string);
+        const lastScore = members[members.length - 1] as number;
         return lastScore;
       }
       return 0;
@@ -426,7 +422,7 @@ export class PresenceTracker {
    */
   private async removeVisitorEntries(key: string, visitor_id: string): Promise<void> {
     try {
-      const members = await redis.getClient().zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
+      const members = await redis.getClient().zrange(key, '-inf', '+inf', { byScore: true, withScores: true });
       
       for (let i = 0; i < members.length; i += 2) {
         const member = members[i];
@@ -447,18 +443,14 @@ export class PresenceTracker {
           }
           
           if (data.visitor_id === visitor_id) {
-            if (member) {
-              await redis.getClient().zrem(key, member);
-              console.log('PresenceTracker: Removed old visitor entry', { visitor_id, member });
-            }
+            await redis.getClient().zrem(key, member);
+            console.log('PresenceTracker: Removed old visitor entry', { visitor_id, member });
           }
         } catch (parseError) {
           console.warn('Error parsing member for removal:', parseError, 'Member:', member);
           // Parse edilemeyen member'ı da sil
           try {
-            if (member) {
-              await redis.getClient().zrem(key, member);
-            }
+            await redis.getClient().zrem(key, member);
           } catch (removalError) {
             console.warn('Error removing invalid member:', removalError);
           }
@@ -476,7 +468,7 @@ export class PresenceTracker {
    */
   private async removeSessionEntries(key: string, session_id: string): Promise<void> {
     try {
-      const members = await redis.getClient().zrangebyscore(key, '-inf', '+inf', 'WITHSCORES');
+      const members = await redis.getClient().zrange(key, '-inf', '+inf', { byScore: true, withScores: true });
       
       for (let i = 0; i < members.length; i += 2) {
         const member = members[i];
@@ -510,18 +502,14 @@ export class PresenceTracker {
           }
           
           if (data.session_id === session_id) {
-            if (member) {
-              await redis.getClient().zrem(key, member);
-              console.log('PresenceTracker: Removed old session entry', { session_id, member });
-            }
+            await redis.getClient().zrem(key, member);
+            console.log('PresenceTracker: Removed old session entry', { session_id, member });
           }
         } catch (parseError) {
           console.warn('Error parsing member for removal:', parseError, 'Member:', member);
           // Parse edilemeyen member'ı da sil
           try {
-            if (member) {
-              await redis.getClient().zrem(key, member);
-            }
+            await redis.getClient().zrem(key, member);
           } catch (removalError) {
             console.warn('Error removing invalid member:', removalError);
           }

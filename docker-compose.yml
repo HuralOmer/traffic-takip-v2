@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # PostgreSQL - OLTP Database
+  postgresql:
+    image: postgres:15
+    container_name: hrl_postgresql
+    environment:
+      POSTGRES_DB: hrl_tracking
+      POSTGRES_USER: hrl_user
+      POSTGRES_PASSWORD: hrl_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+      - ./src/database/migrations/postgresql:/docker-entrypoint-initdb.d
+    networks:
+      - hrl_network
+
+  # ClickHouse - OLAP Database
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: hrl_clickhouse
+    environment:
+      CLICKHOUSE_DB: hrl_analytics
+      CLICKHOUSE_USER: hrl_user
+      CLICKHOUSE_PASSWORD: hrl_password
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./src/database/migrations/clickhouse:/docker-entrypoint-initdb.d
+    networks:
+      - hrl_network
+
+  # Redis - Real-time Metrics & Presence
+  redis:
+    image: redis:7-alpine
+    container_name: hrl_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - hrl_network
+
+  # Application
+  app:
+    build: .
+    container_name: hrl_app
+    environment:
+      - NODE_ENV=development
+      - DATABASE_TYPE=postgresql+clickhouse+redis
+      - POSTGRESQL_URL=postgresql://hrl_user:hrl_password@postgresql:5432/hrl_tracking
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgresql
+      - clickhouse
+      - redis
+    networks:
+      - hrl_network
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+volumes:
+  postgresql_data:
+  clickhouse_data:
+  redis_data:
+
+networks:
+  hrl_network:
+    driver: bridge

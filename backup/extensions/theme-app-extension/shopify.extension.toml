@@ -1,0 +1,20 @@
+# Theme App Extension Configuration
+# Bu dosya Theme App Extension'ın temel konfigürasyonunu içerir
+
+api_version = "2025-07"
+
+[[extensions]]
+
+uid = "d5328ac7-b117-9659-a40a-aeb7d2c001304cb10218"
+
+type = "theme"
+name = "HRL Traffic Tracking"
+handle = "hrl-traffic-tracking"
+
+# Otomatik enjeksiyon ayarları
+[extensions.targeting]
+target = "head"
+auto_inject = true
+
+# Extension ayarları
+[extensions.settings]
