@@ -251,6 +251,12 @@ export class ActiveUsersManager {
    */
   private async processTick(): Promise<void> {
     try {
+      // Redis mevcut değilse tick processing'i skip et
+      const client = redis.getClient();
+      if (!client) {
+        return; // Redis yoksa hiçbir şey yapma
+      }
+
       // Tüm aktif shop'ları al
       const shops = await this.getActiveShops();
       
@@ -319,7 +325,8 @@ export class ActiveUsersManager {
       
       return keys.map((key: string) => key.replace(`${REDIS_KEYS.PRESENCE_VISITORS}:`, ''));
     } catch (error) {
-      console.error('Error getting active shops:', error);
+      // Redis connection errors are expected when Redis is not available
+      // Don't log these as errors to reduce noise
       return [];
     }
   }

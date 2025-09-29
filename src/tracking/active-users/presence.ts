@@ -377,7 +377,8 @@ export class PresenceTracker {
       
       return keys.map((key: string) => key.replace(`${REDIS_KEYS.PRESENCE_VISITORS}:`, ''));
     } catch (error) {
-      console.error('Error getting active shops:', error);
+      // Redis connection errors are expected when Redis is not available
+      // Don't log these as errors to reduce noise
       return [];
     }
   }
