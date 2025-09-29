@@ -36,9 +36,7 @@ class RedisManager {
         keepAlive: 30000,
         connectTimeout: 3000,
         commandTimeout: 2000,
-        enableOfflineQueue: false,
-        retryDelayOnFailover: 100,
-        retryDelayOnClusterDown: 100
+        enableOfflineQueue: false
       });
 
       // Event listeners
