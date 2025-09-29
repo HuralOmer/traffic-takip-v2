@@ -50,8 +50,11 @@ class RedisManager {
         this.isConnected = true;
       });
 
-      this.client.on('error', (error) => {
-        logger.error('Redis client error:', error);
+      this.client.on('error', () => {
+        // Only log error once per connection attempt
+        if (!this.isConnected) {
+          logger.warn('Redis client connection failed - Redis features disabled');
+        }
         this.isConnected = false;
       });
 
@@ -60,9 +63,7 @@ class RedisManager {
         this.isConnected = false;
       });
 
-      this.client.on('reconnecting', () => {
-        logger.info('Redis client reconnecting...');
-      });
+      // Don't log reconnecting attempts to reduce noise
 
     } catch (error) {
       logger.error('Failed to initialize Redis client:', error);
