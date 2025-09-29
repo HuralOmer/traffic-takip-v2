@@ -399,7 +399,7 @@ export class PostgreSQLAdapter implements OLTPDatabaseAdapter {
     const query = 'DELETE FROM products WHERE id = $1';
     try {
       const result = await this.pool.query(query, [productId]);
-      return result.rowCount > 0;
+      return (result.rowCount ?? 0) > 0;
     } catch (error) {
       throw new Error(`Failed to delete product: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
