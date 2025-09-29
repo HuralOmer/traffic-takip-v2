@@ -66,16 +66,18 @@ export class Server {
 
     // Fastify server options
     const serverOptions: FastifyServerOptions = {
-      logger: {
+      logger: process.env['NODE_ENV'] === 'development' ? {
         level: process.env['LOG_LEVEL'] || 'info',
-        transport: process.env['NODE_ENV'] === 'development' ? {
+        transport: {
           target: 'pino-pretty',
           options: {
             colorize: true,
             translateTime: 'HH:MM:ss Z',
             ignore: 'pid,hostname'
           }
-        } : undefined
+        }
+      } : {
+        level: process.env['LOG_LEVEL'] || 'info'
       }
     };
 
