@@ -394,7 +394,7 @@ export class ClickHouseAdapter implements OLAPDatabaseAdapter {
       const total_revenue = data.reduce((sum: number, row: any) => sum + (row.revenue || 0), 0);
 
       return {
-        hour: date.toISOString().split('T')[0], // Return date as hour identifier
+        hour: date.toISOString().substring(0, 10), // Return date as hour identifier
         page_views: total_page_views,
         sessions: total_sessions,
         unique_users: total_unique_users,
@@ -440,7 +440,7 @@ export class ClickHouseAdapter implements OLAPDatabaseAdapter {
       const data = result.data[0];
 
       return {
-        date: date.toISOString().split('T')[0],
+        date: date.toISOString().substring(0, 10),
         page_views: data.page_views || 0,
         sessions: data.sessions || 0,
         unique_users: data.unique_users || 0,
