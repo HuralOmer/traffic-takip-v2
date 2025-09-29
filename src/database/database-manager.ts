@@ -55,7 +55,10 @@ export class DatabaseManager {
       logger.info('All database connections initialized successfully');
 
     } catch (error) {
-      logger.error('Failed to initialize database connections:', error);
+      logger.error('Failed to initialize database connections:', {
+        error: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : undefined
+      });
       throw error;
     }
   }

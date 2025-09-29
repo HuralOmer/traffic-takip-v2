@@ -55,6 +55,8 @@ services:
       - POSTGRESQL_URL=postgresql://hrl_user:hrl_password@postgresql:5432/hrl_tracking
       - CLICKHOUSE_URL=http://clickhouse:8123
       - REDIS_URL=redis://redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     ports:
       - "3000:3000"
     depends_on:
