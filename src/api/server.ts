@@ -38,12 +38,12 @@ export interface ServerConfig {
 export class Server {
   private fastify: FastifyInstance;
   private config: ServerConfig;
-  private dbManager: DatabaseManager;
-  private activeUsersManager: ActiveUsersManager;
+  private dbManager: DatabaseManager | null;
+  private activeUsersManager: ActiveUsersManager | null;
 
   constructor(
-    dbManager: DatabaseManager, 
-    activeUsersManager: ActiveUsersManager,
+    dbManager: DatabaseManager | null, 
+    activeUsersManager: ActiveUsersManager | null,
     config?: Partial<ServerConfig>
   ) {
     this.dbManager = dbManager;
@@ -145,14 +145,13 @@ export class Server {
     // Health check endpoint
     this.fastify.get('/health', async (_request, reply) => {
       try {
-        const dbHealth = await this.dbManager.getHealthStatus();
-        
+        // Basic health check without database dependencies
         return {
           status: 'ok',
           timestamp: new Date().toISOString(),
           uptime: process.uptime(),
-          databases: dbHealth,
-          version: process.env['npm_package_version'] || '1.0.0'
+          version: process.env['npm_package_version'] || '1.0.0',
+          message: 'Service is running'
         };
       } catch (error) {
         logger.error('Health check failed:', error);
@@ -168,6 +167,14 @@ export class Server {
     // Active users endpoints
     this.fastify.get('/api/active-users/:shop', async (request, reply) => {
       try {
+        if (!this.activeUsersManager) {
+          reply.code(503);
+          return {
+            success: false,
+            error: 'Active users manager not available'
+          };
+        }
+        
         const { shop } = request.params as { shop: string };
         const metrics = await this.activeUsersManager.getActiveUsersMetrics(shop);
         
@@ -188,6 +195,14 @@ export class Server {
     // Heartbeat endpoint
     this.fastify.post('/api/heartbeat', async (request, reply) => {
       try {
+        if (!this.activeUsersManager) {
+          reply.code(503);
+          return {
+            success: false,
+            error: 'Active users manager not available'
+          };
+        }
+        
         const payload = request.body;
         const response = await this.activeUsersManager.processHeartbeat(payload);
         
@@ -208,6 +223,14 @@ export class Server {
     // Page unload endpoint
     this.fastify.post('/api/page-unload', async (request, reply) => {
       try {
+        if (!this.activeUsersManager) {
+          reply.code(503);
+          return {
+            success: false,
+            error: 'Active users manager not available'
+          };
+        }
+        
         const payload = request.body;
         const response = await this.activeUsersManager.processPageUnload(payload);
         

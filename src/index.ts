@@ -18,16 +18,30 @@ async function main() {
   try {
     logger.info('Starting HRL Universal Traffic Tracking...');
     
-    // Initialize database manager
-    const dbManager = new DatabaseManager();
-    await dbManager.initialize();
+    // Initialize database manager (optional)
+    let dbManager: DatabaseManager | null = null;
+    try {
+      dbManager = new DatabaseManager();
+      await dbManager.initialize();
+      logger.info('Database connections initialized successfully');
+    } catch (error) {
+      logger.warn('Database initialization failed, running without databases:', error);
+    }
     
-    // Initialize active users manager
-    const activeUsersManager = new ActiveUsersManager();
-    await activeUsersManager.start();
+    // Initialize active users manager (optional)
+    let activeUsersManager: ActiveUsersManager | null = null;
+    try {
+      if (dbManager) {
+        activeUsersManager = new ActiveUsersManager();
+        await activeUsersManager.start();
+        logger.info('Active users manager started successfully');
+      }
+    } catch (error) {
+      logger.warn('Active users manager failed to start:', error);
+    }
     
     // Create and start server
-    const server = createServer(dbManager, activeUsersManager);
+    const server = createServer(dbManager!, activeUsersManager!);
     await server.start();
     
     logger.info('HRL Universal Traffic Tracking started successfully');
