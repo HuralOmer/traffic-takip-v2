@@ -18,20 +18,38 @@ class RedisManager {
   }
 
   /**
-   * Initialize Redis client
+   * Initialize Redis client (lazy initialization)
    */
   private initializeClient(): void {
+    // Don't create client immediately - wait for first usage
+    logger.info('Redis client will be created on first usage');
+  }
+
+  /**
+   * Get Redis client (lazy initialization)
+   */
+  public getClient(): Redis | null {
+    // Create client only when first requested
+    if (!this.client && process.env['REDIS_URL']) {
+      this.createClient();
+    }
+    return this.client;
+  }
+
+  /**
+   * Create Redis client with proper error handling
+   */
+  private createClient(): void {
     try {
-      // Only initialize Redis if REDIS_URL is explicitly set
-      if (!process.env['REDIS_URL']) {
-        logger.info('Redis URL not provided, Redis client will not be initialized');
+      const redisUrl = process.env['REDIS_URL'];
+      if (!redisUrl) {
         return;
       }
 
-      const redisUrl = process.env['REDIS_URL'];
+      logger.info('Creating Redis client...');
       
       this.client = new Redis(redisUrl, {
-        maxRetriesPerRequest: 0, // Disable retries
+        maxRetriesPerRequest: 0,
         lazyConnect: true,
         keepAlive: 30000,
         connectTimeout: 3000,
@@ -63,19 +81,10 @@ class RedisManager {
         this.isConnected = false;
       });
 
-      // Don't log reconnecting attempts to reduce noise
-
     } catch (error) {
-      logger.error('Failed to initialize Redis client:', error);
-      throw error;
+      logger.error('Failed to create Redis client:', error);
+      this.client = null;
     }
-  }
-
-  /**
-   * Get Redis client
-   */
-  public getClient(): Redis | null {
-    return this.client;
   }
 
   /**
