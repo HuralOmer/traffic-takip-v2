@@ -5,7 +5,7 @@
  * a unified interface for database operations
  */
 
-import { DatabaseAdapter, OLTPDatabaseAdapter, OLAPDatabaseAdapter, CacheDatabaseAdapter } from './interfaces/database.interface';
+import { OLTPDatabaseAdapter, OLAPDatabaseAdapter, CacheDatabaseAdapter } from './interfaces/database.interface';
 import { PostgreSQLAdapter } from './adapters/postgresql';
 import { ClickHouseAdapter } from './adapters/clickhouse';
 import { RedisAdapter } from './adapters/redis';
@@ -164,7 +164,7 @@ export class DatabaseManager {
    * Initialize database adapters based on environment
    */
   private initializeAdapters(): void {
-    const databaseType = process.env.DATABASE_TYPE || 'postgresql+clickhouse+redis';
+    const databaseType = process.env['DATABASE_TYPE'] || 'postgresql+clickhouse+redis';
 
     if (databaseType.includes('postgresql')) {
       this.postgresql = new PostgreSQLAdapter();

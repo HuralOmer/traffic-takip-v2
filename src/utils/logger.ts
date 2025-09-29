@@ -34,7 +34,7 @@ export class Logger {
   }
 
   private getLogLevel(): number {
-    const envLevel = process.env.LOG_LEVEL?.toUpperCase() || 'INFO';
+    const envLevel = process.env['LOG_LEVEL']?.toUpperCase() || 'INFO';
     return LOG_LEVELS[envLevel as keyof LogLevel] ?? LOG_LEVELS.INFO;
   }
 
@@ -57,7 +57,7 @@ export class Logger {
 
     const logEntry = this.formatMessage(level, message, meta);
     
-    if (process.env.LOG_FORMAT === 'json') {
+    if (process.env['LOG_FORMAT'] === 'json') {
       console.log(JSON.stringify(logEntry));
     } else {
       const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';

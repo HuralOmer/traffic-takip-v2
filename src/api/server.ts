@@ -51,15 +51,15 @@ export class Server {
     
     // Default configuration
     this.config = {
-      port: parseInt(process.env.PORT || '3000'),
-      host: process.env.HOST || '0.0.0.0',
+      port: parseInt(process.env['PORT'] || '3000'),
+      host: process.env['HOST'] || '0.0.0.0',
       cors: {
-        origin: process.env.CORS_ORIGIN?.split(',') || '*',
+        origin: process.env['CORS_ORIGIN']?.split(',') || '*',
         credentials: true
       },
       rateLimit: {
-        max: parseInt(process.env.RATE_LIMIT_MAX || '100'),
-        timeWindow: process.env.RATE_LIMIT_WINDOW || '1 minute'
+        max: parseInt(process.env['RATE_LIMIT_MAX'] || '100'),
+        timeWindow: process.env['RATE_LIMIT_WINDOW'] || '1 minute'
       },
       ...config
     };
@@ -67,8 +67,8 @@ export class Server {
     // Fastify server options
     const serverOptions: FastifyServerOptions = {
       logger: {
-        level: process.env.LOG_LEVEL || 'info',
-        transport: process.env.NODE_ENV === 'development' ? {
+        level: process.env['LOG_LEVEL'] || 'info',
+        transport: process.env['NODE_ENV'] === 'development' ? {
           target: 'pino-pretty',
           options: {
             colorize: true,
@@ -112,11 +112,11 @@ export class Server {
       await this.fastify.register(rateLimit, {
         max: this.config.rateLimit.max,
         timeWindow: this.config.rateLimit.timeWindow,
-        errorResponseBuilder: (request, context) => ({
+        errorResponseBuilder: (_request, context) => ({
           code: 429,
           error: 'Too Many Requests',
-          message: `Rate limit exceeded, retry in ${Math.round(context.after)}ms`,
-          retryAfter: Math.round(context.after)
+          message: `Rate limit exceeded, retry in ${Math.round(Number(context.after))}ms`,
+          retryAfter: Math.round(Number(context.after))
         })
       });
 
@@ -141,7 +141,7 @@ export class Server {
    */
   private setupRoutes(): void {
     // Health check endpoint
-    this.fastify.get('/health', async (request, reply) => {
+    this.fastify.get('/health', async (_request, reply) => {
       try {
         const dbHealth = await this.dbManager.getHealthStatus();
         
@@ -150,7 +150,7 @@ export class Server {
           timestamp: new Date().toISOString(),
           uptime: process.uptime(),
           databases: dbHealth,
-          version: process.env.npm_package_version || '1.0.0'
+          version: process.env['npm_package_version'] || '1.0.0'
         };
       } catch (error) {
         logger.error('Health check failed:', error);
@@ -266,13 +266,13 @@ export class Server {
     });
 
     // Error handler
-    this.fastify.setErrorHandler((error, request, reply) => {
+    this.fastify.setErrorHandler((error, _request, reply) => {
       logger.error('Unhandled error:', error);
       
       reply.code(500).send({
         success: false,
         error: 'Internal Server Error',
-        message: process.env.NODE_ENV === 'development' ? error.message : 'Something went wrong'
+        message: process.env['NODE_ENV'] === 'development' ? error.message : 'Something went wrong'
       });
     });
 
