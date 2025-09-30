@@ -34,7 +34,10 @@ export class RedisAdapter implements CacheDatabaseAdapter {
       this.client = createClient(clientOptions);
 
       this.client.on('error', (err) => {
-        console.error('Redis Client Error:', err);
+        // Only log Redis errors once to reduce spam
+        if (!this.connected) {
+          console.warn('Redis Client Error:', err.message);
+        }
         this.connected = false;
       });
 

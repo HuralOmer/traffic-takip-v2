@@ -42,8 +42,14 @@ export class DatabaseManager {
         connectionPromises.push(this.clickhouse.connect());
       }
 
+      // Redis connection is optional - don't fail if Redis is not available
       if (this.redis) {
-        connectionPromises.push(this.redis.connect());
+        connectionPromises.push(
+          this.redis.connect().catch((error) => {
+            logger.warn('Redis connection failed, continuing without Redis:', error.message);
+            return Promise.resolve(); // Don't fail the entire initialization
+          })
+        );
       }
 
       await Promise.all(connectionPromises);
