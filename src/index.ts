@@ -25,7 +25,7 @@ async function main() {
       await dbManager.initialize();
       logger.info('Database connections initialized successfully');
     } catch (error) {
-      logger.warn('Database initialization failed, running without databases:', error);
+      logger.warn('Database initialization failed, running without databases:', error instanceof Error ? error.message : String(error));
     }
     
     // Initialize active users manager (optional)
@@ -37,17 +37,17 @@ async function main() {
         logger.info('Active users manager started successfully');
       }
     } catch (error) {
-      logger.warn('Active users manager failed to start:', error);
+      logger.warn('Active users manager failed to start:', error instanceof Error ? error.message : String(error));
     }
     
     // Create and start server
-    const server = createServer(dbManager!, activeUsersManager!);
+    const server = createServer(dbManager, activeUsersManager);
     await server.start();
     
     logger.info('HRL Universal Traffic Tracking started successfully');
     
   } catch (error) {
-    logger.error('Failed to start application:', error);
+    logger.error('Failed to start application:', error instanceof Error ? error.message : String(error));
     process.exit(1);
   }
 }
@@ -64,6 +64,6 @@ process.on('SIGTERM', async () => {
 });
 
 main().catch((error) => {
-  logger.error('Unhandled error:', error);
+  logger.error('Unhandled error:', error instanceof Error ? error.message : String(error));
   process.exit(1);
 });

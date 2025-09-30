@@ -346,8 +346,8 @@ export class Server {
  * Create server instance
  */
 export function createServer(
-  dbManager: DatabaseManager, 
-  activeUsersManager: ActiveUsersManager,
+  dbManager: DatabaseManager | null, 
+  activeUsersManager: ActiveUsersManager | null,
   config?: Partial<ServerConfig>
 ): Server {
   return new Server(dbManager, activeUsersManager, config);
