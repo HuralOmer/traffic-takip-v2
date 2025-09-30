@@ -62,21 +62,32 @@ export class Server {
       ...config
     };
 
-    // Fastify server options
-    const serverOptions: FastifyServerOptions = {
-      logger: process.env['NODE_ENV'] === 'development' ? {
-        level: process.env['LOG_LEVEL'] || 'info',
-        transport: {
+    // Fastify server options with safe logger configuration
+    const loggerConfig: any = {
+      level: process.env['LOG_LEVEL'] || 'info'
+    };
+
+    // Only add pino-pretty transport in development if explicitly enabled
+    if (process.env['NODE_ENV'] === 'development' && process.env['USE_PINO_PRETTY'] === 'true') {
+      try {
+        // Test if pino-pretty is available
+        require.resolve('pino-pretty');
+        loggerConfig.transport = {
           target: 'pino-pretty',
           options: {
             colorize: true,
             translateTime: 'HH:MM:ss Z',
             ignore: 'pid,hostname'
           }
-        }
-      } : {
-        level: process.env['LOG_LEVEL'] || 'info'
+        };
+      } catch (error) {
+        // pino-pretty not available, use default logger
+        console.warn('pino-pretty not available, using default logger');
       }
+    }
+
+    const serverOptions: FastifyServerOptions = {
+      logger: loggerConfig
     };
 
     this.fastify = Fastify(serverOptions);
